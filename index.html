@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ABN-ChemicalLogbook</title>
+    <title>CHEMTRACK Pro v16 - Corporate Green</title>
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
@@ -11,6 +11,21 @@
     <style>
         .btn-tap:active { transform: scale(0.95); }
         ::-webkit-scrollbar { display: none; }
+        body { 
+    /* Gradient overlay para luminaw ang text (Mint White effect) */
+    background-image: linear-gradient(rgba(240, 249, 246, 0.9), rgba(240, 249, 246, 0.9)), 
+                      url('./assets/bg.jpg');
+    background-size: cover; 
+    background-position: center; 
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+}
+
+/* Dagdag pogi point: Siguraduhin nating transparent ang ibang sections 
+   para lumitaw ang background image */
+#main-ui, #area-screen {
+    background: transparent;
+}
         /* Green Theme Tab Active */
         .tab-active { border-bottom: 4px solid #059669; color: #059669; font-weight: 900; }
         .admin-hidden { display: none !important; }
@@ -21,9 +36,9 @@
 </head>
 <body class="bg-[#f0f9f6] text-slate-900 font-sans min-h-screen">
 
-    <div class="p-6 bg-white border-b border-emerald-100 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+    <div class="p-6 bg-white/80 backdrop-blur-md border-b border-emerald-100 flex justify-between items-center sticky top-0 z-40 shadow-sm">
         <div>
-            <h1 class="text-xl font-black italic uppercase text-emerald-900 tracking-tighter">CHEMICAL<span class="text-emerald-500">LOGBOOK</span></h1>
+            <h1 class="text-xl font-black italic uppercase text-emerald-900 tracking-tighter">CHEM<span class="text-emerald-500">TRACK</span></h1>
             <p id="display-date" class="text-[9px] font-black text-emerald-400 tracking-widest uppercase mt-1"></p>
         </div>
         <div class="flex items-center space-x-2">
@@ -38,8 +53,7 @@
                 <div id="notif-badge" class="hidden absolute -top-2 -right-1 bg-red-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white badge-pulse">0</div>
             </div>
         </div>
-    </div>
-
+     </div>
     <div id="main-ui">
         <div id="area-screen" class="p-6 grid grid-cols-2 gap-4">
             <h2 class="col-span-2 text-[10px] font-black text-emerald-800/40 uppercase tracking-[0.3em] mb-4 italic text-center">Select Plant Area</h2>
