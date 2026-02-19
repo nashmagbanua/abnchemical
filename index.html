@@ -254,38 +254,94 @@
     // --- VISOR PANEL & UI LOGIC (Binalik lahat ng dati mong functions) ---
 
     function applyFilters() {
-        const container = document.getElementById('admin-content-area');
-        const dt = document.getElementById('f-date').value;
-        const currentMonth = new Date().toISOString().slice(0, 7); 
-        let d = logs.filter(l => l.type === activeTab);
+    const container = document.getElementById('admin-content-area');
+    const dt = document.getElementById('f-date').value;
+    const currentMonth = new Date().toISOString().slice(0, 7); 
+    let d = logs.filter(l => l.type === activeTab);
 
-        if(dt) d = d.filter(l => l.date === dt);
-        else d = d.filter(l => l.date.startsWith(currentMonth));
+    if(dt) d = d.filter(l => l.date === dt);
+    else d = d.filter(l => l.date.startsWith(currentMonth));
 
-        if (activeTab === 'OUT') {
-            const ch = document.getElementById('f-chem').value;
-            const ar = document.getElementById('f-area').value;
-            if(ch !== 'ALL') d = d.filter(l => l.chemId === ch);
-            if(ar !== 'ALL') d = d.filter(l => l.area === ar);
-            
-            container.innerHTML = `
-                <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
-                <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
-                    <div class="grid grid-cols-3 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chemical</span><span>Area</span><span class="text-right">Qty</span></div>
-                    ${d.length ? d.map(l => `<div class="grid grid-cols-3 p-4 border-b border-emerald-50 text-[10px] font-bold uppercase last:border-0"><span>${l.chemName}</span><span class="text-emerald-500 italic">${l.area}</span><span class="text-right font-black text-emerald-900">-${l.qty}</span></div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black italic">No Records</div>'}
-                </div>`;
-        } else {
-            const rcv = document.getElementById('f-rcv').value.toUpperCase();
-            if(rcv) d = d.filter(l => l.receivedBy.toUpperCase().includes(rcv));
+    if (activeTab === 'OUT') {
+        const ch = document.getElementById('f-chem').value;
+        const ar = document.getElementById('f-area').value;
+        if(ch !== 'ALL') d = d.filter(l => l.chemId === ch);
+        if(ar !== 'ALL') d = d.filter(l => l.area === ar);
+        
+        container.innerHTML = `
+            <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
+            <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
+                <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chem</span><span>Area</span><span class="text-right">Qty</span><span class="text-right">Action</span></div>
+                ${d.length ? d.map(l => `
+                    <div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[10px] font-bold uppercase last:border-0 items-center">
+                        <span class="leading-tight">${l.chemName}<br><span class="text-[7px] text-emerald-300 font-normal">${l.time}</span></span>
+                        <span class="text-emerald-500 italic">${l.area}</span>
+                        <span class="text-right font-black text-emerald-900">-${l.qty}</span>
+                        <div class="text-right"><button onclick="deleteUsage(${l.id})" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase active:bg-red-500 active:text-white">Undo</button></div>
+                    </div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black italic">No Records</div>'}
+            </div>`;
+    } else {
+        const rcv = document.getElementById('f-rcv').value.toUpperCase();
+        if(rcv) d = d.filter(l => l.receivedBy.toUpperCase().includes(rcv));
 
-            container.innerHTML = `
-                <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
-                <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
-                    <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Date</span><span>Chem</span><span>Qty</span><span>By</span></div>
-                    ${d.length ? d.map(l => `<div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[9px] font-bold uppercase last:border-0 italic"><span class="text-emerald-300">${l.date.split('-').slice(1).join('/')}</span><span>${l.chemName}</span><span class="text-emerald-700">+${l.qty}</span><span class="truncate">${l.receivedBy}</span></div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black">No Deliveries</div>'}
-                </div>`;
-        }
+        container.innerHTML = `
+            <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
+            <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
+                <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chem/By</span><span>Qty</span><span>Total</span><span class="text-right">Action</span></div>
+                ${d.length ? d.map(l => `
+                    <div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[9px] font-bold uppercase last:border-0 items-center">
+                        <span class="leading-tight">${l.chemName}<br><span class="text-[7px] text-emerald-400 font-normal italic">By: ${l.receivedBy}</span></span>
+                        <span class="text-emerald-700">+${l.qty} ${l.unit}</span>
+                        <span class="font-black text-emerald-900">${l.totalKg || l.qty}kg</span>
+                        <div class="text-right"><button onclick="deleteDelivery(${l.id})" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase active:bg-red-500 active:text-white italic">Del</button></div>
+                    </div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black">No Deliveries</div>'}
+            </div>`;
     }
+}
+    // DELETE USAGE: Ibabalik ang stock
+function deleteUsage(logId) {
+    if(!confirm("CORRECTION: Delete this usage and RETURN stock to inventory?")) return;
+    const logIndex = logs.findIndex(l => l.id === logId);
+    if(logIndex === -1) return;
+    
+    const logEntry = logs[logIndex];
+    const chem = chemicals.find(c => c.id === logEntry.chemId);
+    if(chem) chem.balance += logEntry.qty; // Ibalik ang binawas
+
+    logs.splice(logIndex, 1);
+    saveData();
+    applyFilters();
+    renderChems();
+    updateNotifBadge();
+    alert("Usage undone. Stock restored!");
+}
+
+// DELETE DELIVERY: Ibabawas ang stock na maling nadagdag
+function deleteDelivery(logId) {
+    if(!confirm("CORRECTION: Remove this delivery and DEDUCT from stock?")) return;
+    const logIndex = logs.findIndex(l => l.id === logId);
+    if(logIndex === -1) return;
+    
+    const logEntry = logs[logIndex];
+    const chem = chemicals.find(c => c.id === logEntry.chemId);
+    
+    // Kunin kung magkano ang dapat ibawas (yung totalKg na na-record)
+    let amountToDeduct = logEntry.totalKg || logEntry.qty;
+
+    if(chem) {
+        if(chem.balance < amountToDeduct) {
+            if(!confirm("Warning: Stock is lower than the delivery amount. Balance will go negative. Proceed?")) return;
+        }
+        chem.balance -= amountToDeduct;
+    }
+
+    logs.splice(logIndex, 1);
+    saveData();
+    applyFilters();
+    renderChems();
+    updateNotifBadge();
+    alert("Delivery record removed. Stock adjusted!");
+}
 
     function renderFilterBar() {
         const bar = document.getElementById('filter-bar');
