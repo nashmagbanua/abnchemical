@@ -133,111 +133,206 @@
         </div>
     </div>
  <script>
-        let logs = JSON.parse(localStorage.getItem('chem_final_v16')) || [];
-        let chemicals = [
-            { id: 'hydro', name: 'Hydrologic Acid', unit: 'Cby', balance: 50, alert: 10 },
-            { id: 'caustic', name: 'Caustic Soda', unit: 'Cby', balance: 50, alert: 10 },
-            { id: 'chlorine', name: 'Chlorine', unit: 'Cby', balance: 40, alert: 10 },
-            { id: 'alum', name: 'Aluminium Sulphate', unit: 'kg', balance: 250, alert: 50 },
-            { id: 'amphos', name: 'Ammonium Phosphate', unit: 'kg', balance: 250, alert: 50 },
-            { id: 'polymer', name: 'Polymer', unit: 'kg', balance: 100, alert: 25 }
-        ];
+    let logs = JSON.parse(localStorage.getItem('chem_final_v16')) || [];
+    let chemicals = [
+        { id: 'hydro', name: 'Hydrologic Acid', unit: 'Cby', balance: 50, alert: 10 },
+        { id: 'caustic', name: 'Caustic Soda', unit: 'Cby', balance: 50, alert: 10 },
+        { id: 'chlorine', name: 'Chlorine', unit: 'Cby', balance: 40, alert: 10 },
+        { id: 'alum', name: 'Aluminium Sulphate', unit: 'kg', balance: 250, alert: 50 },
+        { id: 'amphos', name: 'Ammonium Phosphate', unit: 'kg', balance: 250, alert: 50 },
+        { id: 'polymer', name: 'Polymer', unit: 'kg', balance: 100, alert: 25 }
+    ];
 
-        let activeTab = 'OUT';
-        let currentArea = null;
+    let activeTab = 'OUT';
+    let currentArea = null;
 
-        function getToday() { return new Date().toISOString().split('T')[0]; }
+    function getToday() { return new Date().toISOString().split('T')[0]; }
 
-        function init() {
-            document.getElementById('display-date').innerText = `${new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`;
-            const savedStock = JSON.parse(localStorage.getItem('chem_v16_stock'));
-            if(savedStock) chemicals.forEach(c => c.balance = savedStock[c.id] ?? c.balance);
-            document.getElementById('admin-chem-select').innerHTML = chemicals.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    function init() {
+        document.getElementById('display-date').innerText = `${new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`;
+        const savedStock = JSON.parse(localStorage.getItem('chem_v16_stock'));
+        if(savedStock) chemicals.forEach(c => c.balance = savedStock[c.id] ?? c.balance);
+        document.getElementById('admin-chem-select').innerHTML = chemicals.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        updateNotifBadge();
+    }
+
+    // --- MAIN ACTION LOGIC ---
+
+    function renderChems() {
+        document.getElementById('chem-grid').innerHTML = chemicals.map(c => `
+            <button 
+                onclick="tapSubtract('${c.id}')" 
+                oncontextmenu="event.preventDefault(); correctionReturn('${c.id}')"
+                class="relative bg-white p-6 rounded-[2.5rem] border-2 ${c.balance <= c.alert ? 'border-red-500 bg-red-50' : 'border-emerald-50'} btn-tap flex flex-col items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#064e3b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mb-2"><path d="M10 2v8L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45L14 10V2z"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg>
+                <span class="text-[8px] font-black uppercase text-emerald-800/40 mb-1 text-center truncate w-full">${c.name}</span>
+                <div class="text-[12px] font-black text-emerald-900">${c.balance} ${c.unit}</div>
+                ${c.id === 'alum' ? '<span class="text-[7px] font-bold text-emerald-400 mt-1 uppercase italic">-25kg per tap</span>' : ''}
+            </button>
+        `).join('');
+    }
+
+    function tapSubtract(chemId) {
+        const chem = chemicals.find(c => c.id === chemId);
+        // MAGIC LOGIC: Kapag alum, 25 agad bawas. Kapag iba, 1 lang.
+        let qty = (chemId === 'alum') ? 25 : 1;
+
+        if(chem.balance < qty) return alert("Insufficient Stock!");
+
+        chem.balance -= qty;
+        logs.unshift({
+            id: Date.now(), 
+            date: getToday(), 
+            time: new Date().toLocaleTimeString(), 
+            chemId: chem.id, 
+            chemName: chem.name, 
+            area: currentArea, 
+            qty: qty, 
+            unit: chem.unit, 
+            type: 'OUT'
+        });
+
+        saveData();
+        renderChems();
+        updateNotifBadge();
+    }
+
+    // NEW LOGIC: Correction function (pwedeng i-trigger via long press or supervisor)
+    function correctionReturn(chemId) {
+        const chem = chemicals.find(c => c.id === chemId);
+        let qty = (chemId === 'alum') ? 25 : 1;
+        
+        if(confirm(`CORRECTION: Return ${qty}${chem.unit} to ${chem.name} stock?`)) {
+            chem.balance += qty;
+            // Burahin ang huling usage entry sa logs para malinis ang report
+            const index = logs.findIndex(l => l.chemId === chemId && l.type === 'OUT');
+            if (index > -1) logs.splice(index, 1);
+            
+            saveData();
+            renderChems();
             updateNotifBadge();
+            alert("Stock Corrected!");
         }
+    }
 
-        function applyFilters() {
-            const container = document.getElementById('admin-content-area');
-            const dt = document.getElementById('f-date').value;
-            const currentMonth = new Date().toISOString().slice(0, 7); 
-            let d = logs.filter(l => l.type === activeTab);
+    function adminAddStock() {
+        const id = document.getElementById('admin-chem-select').value;
+        const qtyInput = parseFloat(document.getElementById('admin-qty').value);
+        const rcv = document.getElementById('admin-receiver').value;
+        
+        if(!qtyInput || qtyInput <= 0 || !rcv) return alert("Missing fields!");
+        
+        const chem = chemicals.find(c => c.id === id);
+        
+        // MAGIC LOGIC: Kapag Alum ang dinala (ex: 150 sacks), * 25kg agad.
+        let finalAdd = (id === 'alum') ? qtyInput * 25 : qtyInput;
+        
+        chem.balance += finalAdd;
+        
+        logs.unshift({
+            id: Date.now(), 
+            date: getToday(), 
+            time: new Date().toLocaleTimeString(), 
+            chemId: id, 
+            chemName: chem.name, 
+            qty: qtyInput, // Nilolog natin yung count (bags/units)
+            totalKg: finalAdd,
+            receivedBy: rcv, 
+            unit: (id === 'alum') ? 'Sacks' : chem.unit, 
+            type: 'IN'
+        });
 
-            if(dt) d = d.filter(l => l.date === dt);
-            else d = d.filter(l => l.date.startsWith(currentMonth));
+        saveData();
+        updateNotifBadge();
+        document.getElementById('admin-qty').value = "";
+        document.getElementById('admin-receiver').value = "";
+        document.getElementById('delivery-form').classList.add('hidden');
+        if(activeTab === 'IN') applyFilters();
+        alert(`Successfully added ${qtyInput} ${id === 'alum' ? 'sacks' : 'units'}`);
+    }
 
-            if (activeTab === 'OUT') {
-                const ch = document.getElementById('f-chem').value;
-                const ar = document.getElementById('f-area').value;
-                if(ch !== 'ALL') d = d.filter(l => l.chemId === ch);
-                if(ar !== 'ALL') d = d.filter(l => l.area === ar);
-                
-                container.innerHTML = `
-                    <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
-                    <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
-                        <div class="grid grid-cols-3 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chemical</span><span>Area</span><span class="text-right">Qty</span></div>
-                        ${d.length ? d.map(l => `<div class="grid grid-cols-3 p-4 border-b border-emerald-50 text-[10px] font-bold uppercase last:border-0"><span>${l.chemName}</span><span class="text-emerald-500 italic">${l.area}</span><span class="text-right font-black text-emerald-900">-${l.qty}</span></div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black italic">No Records</div>'}
-                    </div>`;
-            } else {
-                const rcv = document.getElementById('f-rcv').value.toUpperCase();
-                if(rcv) d = d.filter(l => l.receivedBy.toUpperCase().includes(rcv));
+    // --- VISOR PANEL & UI LOGIC (Binalik lahat ng dati mong functions) ---
 
-                container.innerHTML = `
-                    <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
-                    <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
-                        <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Date</span><span>Chem</span><span>Qty</span><span>By</span></div>
-                        ${d.length ? d.map(l => `<div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[9px] font-bold uppercase last:border-0 italic"><span class="text-emerald-300">${l.date.split('-').slice(1).join('/')}</span><span>${l.chemName}</span><span class="text-emerald-700">+${l.qty}</span><span class="truncate">${l.receivedBy}</span></div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black">No Deliveries</div>'}
-                    </div>`;
-            }
+    function applyFilters() {
+        const container = document.getElementById('admin-content-area');
+        const dt = document.getElementById('f-date').value;
+        const currentMonth = new Date().toISOString().slice(0, 7); 
+        let d = logs.filter(l => l.type === activeTab);
+
+        if(dt) d = d.filter(l => l.date === dt);
+        else d = d.filter(l => l.date.startsWith(currentMonth));
+
+        if (activeTab === 'OUT') {
+            const ch = document.getElementById('f-chem').value;
+            const ar = document.getElementById('f-area').value;
+            if(ch !== 'ALL') d = d.filter(l => l.chemId === ch);
+            if(ar !== 'ALL') d = d.filter(l => l.area === ar);
+            
+            container.innerHTML = `
+                <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
+                <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
+                    <div class="grid grid-cols-3 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chemical</span><span>Area</span><span class="text-right">Qty</span></div>
+                    ${d.length ? d.map(l => `<div class="grid grid-cols-3 p-4 border-b border-emerald-50 text-[10px] font-bold uppercase last:border-0"><span>${l.chemName}</span><span class="text-emerald-500 italic">${l.area}</span><span class="text-right font-black text-emerald-900">-${l.qty}</span></div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black italic">No Records</div>'}
+                </div>`;
+        } else {
+            const rcv = document.getElementById('f-rcv').value.toUpperCase();
+            if(rcv) d = d.filter(l => l.receivedBy.toUpperCase().includes(rcv));
+
+            container.innerHTML = `
+                <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
+                <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
+                    <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Date</span><span>Chem</span><span>Qty</span><span>By</span></div>
+                    ${d.length ? d.map(l => `<div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[9px] font-bold uppercase last:border-0 italic"><span class="text-emerald-300">${l.date.split('-').slice(1).join('/')}</span><span>${l.chemName}</span><span class="text-emerald-700">+${l.qty}</span><span class="truncate">${l.receivedBy}</span></div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black">No Deliveries</div>'}
+                </div>`;
         }
+    }
 
-        function renderFilterBar() {
-            const bar = document.getElementById('filter-bar');
-            if (activeTab === 'STATS') { bar.classList.add('hidden'); return; }
-            bar.classList.remove('hidden');
-            if (activeTab === 'OUT') {
-                bar.innerHTML = `<div class="flex space-x-2"><input type="date" id="f-date" onchange="applyFilters()" class="flex-1 p-2 rounded-xl text-[10px] font-black border border-emerald-200 uppercase bg-white"></div><div class="grid grid-cols-2 gap-2"><select id="f-chem" onchange="applyFilters()" class="p-2 rounded-xl text-[9px] font-black border border-emerald-200 bg-white"><option value="ALL">ALL CHEMICALS</option>${chemicals.map(c => `<option value="${c.id}">${c.name.toUpperCase()}</option>`).join('')}</select><select id="f-area" onchange="applyFilters()" class="p-2 rounded-xl text-[9px] font-black border border-emerald-200 bg-white"><option value="ALL">ALL AREAS</option><option value="BOILER">BOILER</option><option value="WTP">WTP</option><option value="WWTP">WWTP</option><option value="OTHERS">OTHERS</option></select></div>`;
-            } else {
-                bar.innerHTML = `<div class="flex space-x-2"><input type="date" id="f-date" onchange="applyFilters()" class="flex-1 p-2 rounded-xl text-[10px] font-black border border-emerald-200 bg-white"><input type="text" id="f-rcv" oninput="applyFilters()" placeholder="SEARCH RECEIVER..." class="flex-1 p-2 rounded-xl text-[9px] font-black border border-emerald-200 bg-white uppercase italic"></div>`;
-            }
+    function renderFilterBar() {
+        const bar = document.getElementById('filter-bar');
+        if (activeTab === 'STATS') { bar.classList.add('hidden'); return; }
+        bar.classList.remove('hidden');
+        if (activeTab === 'OUT') {
+            bar.innerHTML = `<div class="flex space-x-2"><input type="date" id="f-date" onchange="applyFilters()" class="flex-1 p-2 rounded-xl text-[10px] font-black border border-emerald-200 uppercase bg-white"></div><div class="grid grid-cols-2 gap-2"><select id="f-chem" onchange="applyFilters()" class="p-2 rounded-xl text-[9px] font-black border border-emerald-200 bg-white"><option value="ALL">ALL CHEMICALS</option>${chemicals.map(c => `<option value="${c.id}">${c.name.toUpperCase()}</option>`).join('')}</select><select id="f-area" onchange="applyFilters()" class="p-2 rounded-xl text-[9px] font-black border border-emerald-200 bg-white"><option value="ALL">ALL AREAS</option><option value="BOILER">BOILER</option><option value="WTP">WTP</option><option value="WWTP">WWTP</option><option value="OTHERS">OTHERS</option></select></div>`;
+        } else {
+            bar.innerHTML = `<div class="flex space-x-2"><input type="date" id="f-date" onchange="applyFilters()" class="flex-1 p-2 rounded-xl text-[10px] font-black border border-emerald-200 bg-white"><input type="text" id="f-rcv" oninput="applyFilters()" placeholder="SEARCH RECEIVER..." class="flex-1 p-2 rounded-xl text-[9px] font-black border border-emerald-200 bg-white uppercase italic"></div>`;
         }
+    }
 
-        function renderStats(p) {
-            const container = document.getElementById('admin-content-area');
-            container.innerHTML = `<div class="bg-white p-6 rounded-[2.5rem] border border-emerald-100 shadow-sm mb-4"><div class="flex justify-between items-center mb-6"><h3 class="text-[10px] font-black uppercase text-emerald-800/40">Analytics</h3><select id="stat-p" onchange="renderStats(this.value)" class="text-[9px] font-black bg-emerald-50 p-2 rounded-xl border-none outline-none text-emerald-700"><option value="today">Today</option><option value="month">Month</option><option value="year">Year</option></select></div><div id="stats-chart" class="space-y-6"></div></div>`;
-            document.getElementById('stat-p').value = p;
-            const chart = document.getElementById('stats-chart');
-            const now = new Date();
-            let fl = logs.filter(l => l.type === 'OUT');
-            if(p === 'month') fl = fl.filter(l => l.date.includes(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`));
-            if(p === 'today') fl = fl.filter(l => l.date === getToday());
-            const areas = ["BOILER", "WTP", "WWTP", "OTHERS"];
-            chart.innerHTML = fl.length ? areas.map(area => {
-                const aLogs = fl.filter(l => l.area === area);
-                const total = aLogs.reduce((acc, curr) => acc + curr.qty, 0);
-                const chemMap = {};
-                aLogs.forEach(l => chemMap[l.chemName] = (chemMap[l.chemName] || 0) + l.qty);
-                const maxVal = (p === 'year' ? 1000 : (p === 'month' ? 200 : 30));
-                const perc = Math.min((total / maxVal) * 100, 100);
-                return `<div><div class="flex justify-between text-[10px] font-black mb-1 uppercase"><span>${area}</span><span class="text-emerald-600">${total} Units</span></div><div class="bg-emerald-50 h-3 rounded-full overflow-hidden border border-emerald-100"><div class="bg-emerald-600 h-full rounded-full transition-all duration-1000" style="width: ${perc}%"></div></div><div class="flex flex-wrap gap-x-3 gap-y-1 mt-2">${Object.entries(chemMap).map(([n, q]) => `<span class="text-[8px] font-black text-emerald-400 uppercase italic">• ${n} (${q})</span>`).join('')}</div></div>`;
-            }).join('') : `<div class="py-12 text-center text-emerald-100 text-[10px] font-black uppercase italic">No Data</div>`;
-        }
+    function renderStats(p) {
+        const container = document.getElementById('admin-content-area');
+        container.innerHTML = `<div class="bg-white p-6 rounded-[2.5rem] border border-emerald-100 shadow-sm mb-4"><div class="flex justify-between items-center mb-6"><h3 class="text-[10px] font-black uppercase text-emerald-800/40">Analytics</h3><select id="stat-p" onchange="renderStats(this.value)" class="text-[9px] font-black bg-emerald-50 p-2 rounded-xl border-none outline-none text-emerald-700"><option value="today">Today</option><option value="month">Month</option><option value="year">Year</option></select></div><div id="stats-chart" class="space-y-6"></div></div>`;
+        document.getElementById('stat-p').value = p;
+        const chart = document.getElementById('stats-chart');
+        const now = new Date();
+        let fl = logs.filter(l => l.type === 'OUT');
+        if(p === 'month') fl = fl.filter(l => l.date.includes(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`));
+        if(p === 'today') fl = fl.filter(l => l.date === getToday());
+        const areas = ["BOILER", "WTP", "WWTP", "OTHERS"];
+        chart.innerHTML = fl.length ? areas.map(area => {
+            const aLogs = fl.filter(l => l.area === area);
+            const total = aLogs.reduce((acc, curr) => acc + curr.qty, 0);
+            const chemMap = {};
+            aLogs.forEach(l => chemMap[l.chemName] = (chemMap[l.chemName] || 0) + l.qty);
+            const maxVal = (p === 'year' ? 1000 : (p === 'month' ? 200 : 30));
+            const perc = Math.min((total / maxVal) * 100, 100);
+            return `<div><div class="flex justify-between text-[10px] font-black mb-1 uppercase"><span>${area}</span><span class="text-emerald-600">${total} Units</span></div><div class="bg-emerald-50 h-3 rounded-full overflow-hidden border border-emerald-100"><div class="bg-emerald-600 h-full rounded-full transition-all duration-1000" style="width: ${perc}%"></div></div><div class="flex flex-wrap gap-x-3 gap-y-1 mt-2">${Object.entries(chemMap).map(([n, q]) => `<span class="text-[8px] font-black text-emerald-400 uppercase italic">• ${n} (${q})</span>`).join('')}</div></div>`;
+        }).join('') : `<div class="py-12 text-center text-emerald-100 text-[10px] font-black uppercase italic">No Data</div>`;
+    }
 
-        function setLogTab(t) { activeTab = t; ['OUT', 'IN', 'STATS'].forEach(id => document.getElementById('tab-'+id).classList.toggle('tab-active', id === t)); renderFilterBar(); if(t !== 'STATS') applyFilters(); else renderStats('today'); }
-        function renderChems() { document.getElementById('chem-grid').innerHTML = chemicals.map(c => `<button onclick="tapSubtract('${c.id}')" class="bg-white p-6 rounded-[2.5rem] border-2 ${c.balance <= c.alert ? 'border-red-500 bg-red-50' : 'border-emerald-50'} btn-tap flex flex-col items-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#064e3b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mb-2"><path d="M10 2v8L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45L14 10V2z"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg><span class="text-[8px] font-black uppercase text-emerald-800/40 mb-1 text-center truncate w-full">${c.name}</span><div class="text-[12px] font-black text-emerald-900">${c.balance} ${c.unit}</div></button>`).join(''); }
-        function tapSubtract(chemId) { const chem = chemicals.find(c => c.id === chemId); let qty = 1; if(chem.type === 'weight') { const input = prompt(`KG used for ${chem.name}:`, "1"); if (input === null) return; qty = parseFloat(input); } if(!qty || qty <= 0 || chem.balance < qty) return alert("Invalid Stock!"); chem.balance -= qty; logs.unshift({id: Date.now(), date: getToday(), time: new Date().toLocaleTimeString(), chemId: chem.id, chemName: chem.name, area: currentArea, qty: qty, unit: chem.unit, type: 'OUT'}); saveData(); renderChems(); updateNotifBadge(); }
-        function adminAddStock() { const id = document.getElementById('admin-chem-select').value; const qty = parseFloat(document.getElementById('admin-qty').value); const rcv = document.getElementById('admin-receiver').value; if(!qty || qty <= 0 || !rcv) return alert("Missing fields!"); const chem = chemicals.find(c => c.id === id); let finalAdd = chem.balance += (chem.unit === 'kg' ? qty * 25 : qty); logs.unshift({id: Date.now(), date: getToday(), time: new Date().toLocaleTimeString(), chemId: id, chemName: chem.name, qty: qty, receivedBy: rcv, unit: chem.unit === 'kg' ? 'Sacks' : 'Cby', type: 'IN'}); saveData(); updateNotifBadge(); document.getElementById('admin-qty').value = ""; document.getElementById('admin-receiver').value = ""; document.getElementById('delivery-form').classList.add('hidden'); if(activeTab === 'IN') applyFilters(); }
-        function showShiftSummary() { const h = new Date().getHours(); const shift = (h >= 6 && h < 18) ? "DS" : "NS"; const todayLogs = logs.filter(l => l.date === getToday()); const usage = todayLogs.filter(l => l.type === 'OUT'); const delivery = todayLogs.filter(l => l.type === 'IN'); let res = `📌 SHIFT REPORT (${shift})\nDate: ${getToday()}\n\n--- USAGE ---\n`; if(usage.length) chemicals.forEach(c => { const used = usage.filter(l => l.chemId === c.id).reduce((acc, curr) => acc + curr.qty, 0); if(used > 0) res += `🔹 ${c.name}: ${used} ${c.unit}\n`; }); else res += `(No usage)\n`; res += `\n--- DELIVERIES ---\n`; if(delivery.length) delivery.forEach(d => { res += `📦 ${d.chemName}: +${d.qty} (${d.receivedBy})\n`; }); else res += `(No deliveries)\n`; document.getElementById('summary-text').innerText = res; document.getElementById('summary-modal').style.display = 'flex'; document.getElementById('summary-badge').classList.add('hidden'); }
-        function selectArea(a) { currentArea = a; document.getElementById('area-screen').classList.add('hidden'); document.getElementById('chem-screen').classList.remove('hidden'); document.getElementById('selected-area-label').innerText = a; renderChems(); }
-        function goBack() { document.getElementById('area-screen').classList.remove('hidden'); document.getElementById('chem-screen').classList.add('hidden'); }
-        function openAdmin() { document.getElementById('admin-dashboard').style.display='flex'; document.getElementById('admin-dashboard').classList.remove('admin-hidden'); setLogTab('OUT'); }
-        function closeAdmin() { document.getElementById('admin-dashboard').style.display='none'; document.getElementById('admin-dashboard').classList.add('admin-hidden'); }
-        function toggleDeliveryForm() { document.getElementById('delivery-form').classList.toggle('hidden'); }
-        function closeSummary() { document.getElementById('summary-modal').style.display = 'none'; }
-        function copyReport() { navigator.clipboard.writeText(document.getElementById('summary-text').innerText); alert("Copied!"); }
-        function updateNotifBadge() { const low = chemicals.filter(c => c.balance <= c.alert).length; document.getElementById('notif-badge').innerText = low; document.getElementById('notif-badge').classList.toggle('hidden', low === 0); const count = logs.filter(l => l.date === getToday()).length; document.getElementById('summary-badge').classList.toggle('hidden', count === 0); }
-        function saveData() { localStorage.setItem('chem_final_v16', JSON.stringify(logs)); const stock = {}; chemicals.forEach(c => stock[c.id] = c.balance); localStorage.setItem('chem_v16_stock', JSON.stringify(stock)); }
-        init();
-     document.getElementById('currentYear').textContent = new Date().getFullYear();
-    </script>
+    function setLogTab(t) { activeTab = t; ['OUT', 'IN', 'STATS'].forEach(id => document.getElementById('tab-'+id).classList.toggle('tab-active', id === t)); renderFilterBar(); if(t !== 'STATS') applyFilters(); else renderStats('today'); }
+    function showShiftSummary() { const h = new Date().getHours(); const shift = (h >= 6 && h < 18) ? "DS" : "NS"; const todayLogs = logs.filter(l => l.date === getToday()); const usage = todayLogs.filter(l => l.type === 'OUT'); const delivery = todayLogs.filter(l => l.type === 'IN'); let res = `📌 SHIFT REPORT (${shift})\nDate: ${getToday()}\n\n--- USAGE ---\n`; if(usage.length) chemicals.forEach(c => { const used = usage.filter(l => l.chemId === c.id).reduce((acc, curr) => acc + curr.qty, 0); if(used > 0) res += `🔹 ${c.name}: ${used} ${c.unit}\n`; }); else res += `(No usage)\n`; res += `\n--- DELIVERIES ---\n`; if(delivery.length) delivery.forEach(d => { res += `📦 ${d.chemName}: +${d.qty} (${d.receivedBy})\n`; }); else res += `(No deliveries)\n`; document.getElementById('summary-text').innerText = res; document.getElementById('summary-modal').style.display = 'flex'; document.getElementById('summary-badge').classList.add('hidden'); }
+    function selectArea(a) { currentArea = a; document.getElementById('area-screen').classList.add('hidden'); document.getElementById('chem-screen').classList.remove('hidden'); document.getElementById('selected-area-label').innerText = a; renderChems(); }
+    function goBack() { document.getElementById('area-screen').classList.remove('hidden'); document.getElementById('chem-screen').classList.add('hidden'); }
+    function openAdmin() { document.getElementById('admin-dashboard').style.display='flex'; document.getElementById('admin-dashboard').classList.remove('admin-hidden'); setLogTab('OUT'); }
+    function closeAdmin() { document.getElementById('admin-dashboard').style.display='none'; document.getElementById('admin-dashboard').classList.add('admin-hidden'); }
+    function toggleDeliveryForm() { document.getElementById('delivery-form').classList.toggle('hidden'); }
+    function closeSummary() { document.getElementById('summary-modal').style.display = 'none'; }
+    function copyReport() { navigator.clipboard.writeText(document.getElementById('summary-text').innerText); alert("Copied!"); }
+    function updateNotifBadge() { const low = chemicals.filter(c => c.balance <= c.alert).length; document.getElementById('notif-badge').innerText = low; document.getElementById('notif-badge').classList.toggle('hidden', low === 0); const count = logs.filter(l => l.date === getToday()).length; document.getElementById('summary-badge').classList.toggle('hidden', count === 0); }
+    function saveData() { localStorage.setItem('chem_final_v16', JSON.stringify(logs)); const stock = {}; chemicals.forEach(c => stock[c.id] = c.balance); localStorage.setItem('chem_v16_stock', JSON.stringify(stock)); }
+    
+    init();
+    document.getElementById('currentYear').textContent = new Date().getFullYear();
+</script>
 </body>
 </html>
