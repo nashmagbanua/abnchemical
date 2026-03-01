@@ -135,13 +135,13 @@
  <script>
     let logs = JSON.parse(localStorage.getItem('chem_final_v16')) || [];
     let chemicals = [
-        { id: 'hydro', name: 'Hydrologic Acid', unit: 'Cby', balance: 50, alert: 10 },
-        { id: 'caustic', name: 'Caustic Soda', unit: 'Cby', balance: 50, alert: 10 },
-        { id: 'chlorine', name: 'Chlorine', unit: 'Cby', balance: 40, alert: 10 },
-        { id: 'alum', name: 'Aluminium Sulphate', unit: 'kg', balance: 250, alert: 50 },
-        { id: 'amphos', name: 'Ammonium Phosphate', unit: 'kg', balance: 250, alert: 50 },
-        { id: 'polymer', name: 'Polymer', unit: 'kg', balance: 100, alert: 25 }
-    ];
+    { id: 'hydro', name: 'Hydrochloric Acid', unit: 'Cby', balance: 50, alert: 10, image: 'hydrolic.png' },
+    { id: 'caustic', name: 'Caustic Soda', unit: 'Cby', balance: 50, alert: 10, image: 'caustic.png' },
+    { id: 'chlorine', name: 'Chlorine', unit: 'Cby', balance: 40, alert: 10, image: 'chlorine.png' },
+    { id: 'alum', name: 'Aluminium Sulphate', unit: 'kg', balance: 250, alert: 50, image: 'aluminium.png' },
+    { id: 'polymer', name: 'Polymer', unit: 'kg', balance: 100, alert: 25, image: 'polymer.png' },
+    { id: 'amphos', name: 'Ammonium Phosphate', unit: 'kg', balance: 250, alert: 50, image: 'ammonium.png' }
+];
 
     let activeTab = 'OUT';
     let currentArea = null;
@@ -159,61 +159,76 @@
     // --- MAIN ACTION LOGIC ---
 
     function renderChems() {
-        document.getElementById('chem-grid').innerHTML = chemicals.map(c => `
-            <button 
-                onclick="tapSubtract('${c.id}')" 
-                oncontextmenu="event.preventDefault(); correctionReturn('${c.id}')"
-                class="relative bg-white p-6 rounded-[2.5rem] border-2 ${c.balance <= c.alert ? 'border-red-500 bg-red-50' : 'border-emerald-50'} btn-tap flex flex-col items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#064e3b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mb-2"><path d="M10 2v8L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45L14 10V2z"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg>
-                <span class="text-[8px] font-black uppercase text-emerald-800/40 mb-1 text-center truncate w-full">${c.name}</span>
-                <div class="text-[12px] font-black text-emerald-900">${c.balance} ${c.unit}</div>
-                ${c.id === 'alum' ? '<span class="text-[7px] font-bold text-emerald-400 mt-1 uppercase italic">-25kg per tap</span>' : ''}
-            </button>
-        `).join('');
-    }
+    document.getElementById('chem-grid').innerHTML = chemicals.map(c => {
+        let tapQty = (c.id === 'alum') ? 25 : 1;
+        return `
+            <div class="relative bg-white p-4 rounded-[2.5rem] border-2 ${c.balance <= c.alert ? 'border-red-500 bg-red-50' : 'border-emerald-50'} shadow-sm flex flex-col items-center">
+                
+                <button onclick="tapSubtract('${c.id}')" class="btn-tap flex flex-col items-center w-full">
+                    <img src="assets/${c.image}" alt="${c.name}" class="w-16 h-16 object-contain mb-2 drop-shadow-md">
+                    <span class="text-[8px] font-black uppercase text-emerald-800/40 mb-1 text-center truncate w-full">${c.name}</span>
+                    <div class="text-[14px] font-black text-emerald-900">${c.balance} <span class="text-[10px] text-emerald-500">${c.unit}</span></div>
+                </button>
+
+                <button onclick="correctionReturn('${c.id}')" class="mt-3 bg-orange-50 text-orange-600 text-[7px] font-black px-3 py-1 rounded-full border border-orange-100 uppercase active:bg-orange-500 active:text-white">
+                    Oops! Return ${tapQty}
+                </button>
+                
+                ${c.id === 'alum' ? '<span class="text-[6px] font-bold text-emerald-300 mt-1 uppercase italic">-25kg per tap</span>' : ''}
+            </div>
+        `;
+    }).join('');
+}
 
     function tapSubtract(chemId) {
-        const chem = chemicals.find(c => c.id === chemId);
-        // MAGIC LOGIC: Kapag alum, 25 agad bawas. Kapag iba, 1 lang.
-        let qty = (chemId === 'alum') ? 25 : 1;
+    const chem = chemicals.find(c => c.id === chemId);
+    let qty = (chemId === 'alum') ? 25 : 1;
 
-        if(chem.balance < qty) return alert("Insufficient Stock!");
+    // CONFIRMATION POPUP
+    const confirmTap = confirm(`CONFIRM USAGE:\n\nChemical: ${chem.name.toUpperCase()}\nAmount: -${qty} ${chem.unit}\n\nIpagpapatuloy ba?`);
+    
+    if(!confirmTap) return; // Cancel kung pinindot ang Cancel
 
-        chem.balance -= qty;
-        logs.unshift({
-            id: Date.now(), 
-            date: getToday(), 
-            time: new Date().toLocaleTimeString(), 
-            chemId: chem.id, 
-            chemName: chem.name, 
-            area: currentArea, 
-            qty: qty, 
-            unit: chem.unit, 
-            type: 'OUT'
-        });
+    if(chem.balance < qty) return alert("Insufficient Stock!");
 
+    chem.balance -= qty;
+    logs.unshift({
+        id: Date.now(), 
+        date: getToday(), 
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
+        chemId: chem.id, 
+        chemName: chem.name, 
+        area: currentArea, 
+        qty: qty, 
+        unit: chem.unit, 
+        type: 'OUT'
+    });
+
+    saveData();
+    renderChems();
+    updateNotifBadge();
+}
+
+    // NEW LOGIC: Correction function (pwedeng i-trigger via long press or supervisor)
+   function correctionReturn(chemId) {
+    const chem = chemicals.find(c => c.id === chemId);
+    let qty = (chemId === 'alum') ? 25 : 1;
+    
+    if(confirm(`CORRECTION:\nIabalik ang ${qty} ${chem.unit} sa stock ng ${chem.name}?`)) {
+        chem.balance += qty;
+        
+        // Hanapin ang pinaka-latest na entry ng chemical na ito at burahin
+        const index = logs.findIndex(l => l.chemId === chemId && l.type === 'OUT');
+        if (index > -1) {
+            logs.splice(index, 1);
+        }
+        
         saveData();
         renderChems();
         updateNotifBadge();
+        alert("Stock Corrected!");
     }
-
-    // NEW LOGIC: Correction function (pwedeng i-trigger via long press or supervisor)
-    function correctionReturn(chemId) {
-        const chem = chemicals.find(c => c.id === chemId);
-        let qty = (chemId === 'alum') ? 25 : 1;
-        
-        if(confirm(`CORRECTION: Return ${qty}${chem.unit} to ${chem.name} stock?`)) {
-            chem.balance += qty;
-            // Burahin ang huling usage entry sa logs para malinis ang report
-            const index = logs.findIndex(l => l.chemId === chemId && l.type === 'OUT');
-            if (index > -1) logs.splice(index, 1);
-            
-            saveData();
-            renderChems();
-            updateNotifBadge();
-            alert("Stock Corrected!");
-        }
-    }
+}
 
     function adminAddStock() {
         const id = document.getElementById('admin-chem-select').value;
