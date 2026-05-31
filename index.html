@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ABN-Chemical-LOgbook</title>
-   <link rel="apple-touch-icon" sizes="180x180" href="assets/abnlogo.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/abnlogo.svg">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/abnlogo.ico">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/abnlogo.ico">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,26 +12,44 @@
         .btn-tap:active { transform: scale(0.95); }
         ::-webkit-scrollbar { display: none; }
         body { 
-    /* Gradient overlay para luminaw ang text (Mint White effect) */
-    background-image: linear-gradient(rgba(240, 249, 246, 0.9), rgba(240, 249, 246, 0.9)), 
-                      url('./assets/bg.jpg');
-    background-size: cover; 
-    background-position: center; 
-    background-attachment: fixed;
-    background-repeat: no-repeat;
-}
+            background-image: linear-gradient(rgba(240, 249, 246, 0.9), rgba(240, 249, 246, 0.9)), 
+                              url('./assets/bg.jpg');
+            background-size: cover; 
+            background-position: center; 
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+        }
 
-/* Dagdag pogi point: Siguraduhin nating transparent ang ibang sections 
-   para lumitaw ang background image */
-#main-ui, #area-screen {
-    background: transparent;
-}
-        /* Green Theme Tab Active */
+        #main-ui, #area-screen {
+            background: transparent;
+        }
+        
         .tab-active { border-bottom: 4px solid #059669; color: #059669; font-weight: 900; }
         .admin-hidden { display: none !important; }
         .badge-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
         #summary-modal { z-index: 9999 !important; }
+
+        /* Premium Glassmorphism & UX Additions */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(6, 95, 70, 0.05), 0 10px 10px -5px rgba(6, 95, 70, 0.02);
+        }
+        .qty-bounce {
+            animation: qtyBounce 0.2s ease-out;
+        }
+        @keyframes qtyBounce {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body class="bg-[#f0f9f6] text-slate-900 font-sans min-h-screen">
@@ -74,14 +92,14 @@
             </button>
 
             <button onclick="selectArea('OTHERS')" class="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-emerald-50 btn-tap flex flex-col items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#065f46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#065f46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                 <span class="block font-black text-[11px] uppercase mt-3 tracking-tighter text-emerald-900">Others</span>
             </button>
             <footer class="col-span-2 text-center py-10">
-            <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-800/20">
-                &copy; <span id="currentYear"></span> Nutribev Corporation • All rights reserved
-            </p>
-        </footer>
+                <p class="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-800/20">
+                    &copy; <span id="currentYear"></span> Nutribev Corporation • All rights reserved
+                </p>
+            </footer>
         </div>
 
         <div id="chem-screen" class="p-6 hidden">
@@ -93,6 +111,7 @@
         </div>
     </div>
 
+    <!-- VISOR PANEL DASHBOARD -->
     <div id="admin-dashboard" class="admin-hidden fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden">
         <div class="p-6 border-b border-emerald-100 bg-white shrink-0">
             <div class="flex justify-between items-center mb-4">
@@ -122,6 +141,7 @@
         <div id="admin-content-area" class="flex-1 overflow-y-auto p-4 bg-[#f0f9f6]"></div>
     </div>
 
+    <!-- SHIFT SUMMARY MODAL -->
     <div id="summary-modal" class="hidden fixed inset-0 flex items-center justify-center p-6 backdrop-blur-sm bg-emerald-900/40">
         <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative border-t-8 border-emerald-600">
             <h3 class="font-black text-center uppercase italic mb-4 text-emerald-900">Shift Summary</h3>
@@ -132,22 +152,48 @@
             </div>
         </div>
     </div>
+
+    <!-- PREMIUM CUSTOM TRANSACTION CONFIRMATION MODAL -->
+    <div id="tx-confirm-modal" class="hidden fixed inset-0 flex items-center justify-center p-6 backdrop-blur-md bg-emerald-950/40 z-[10000]">
+        <div class="bg-white/90 backdrop-blur-lg w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl border border-white/40 flex flex-col">
+            <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-4 mx-auto text-emerald-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h3 class="font-black text-center uppercase italic text-emerald-900 tracking-tight mb-2">Confirm Deduction</h3>
+            
+            <p id="tx-modal-msg" class="text-xs text-center text-slate-600 font-medium px-2 mb-4 leading-relaxed"></p>
+            
+            <div class="mb-4">
+                <label class="block text-[9px] font-black uppercase text-emerald-700 tracking-wider mb-1 px-1">Operator Name</label>
+                <input type="text" id="tx-operator" placeholder="ENTER YOUR NAME..." class="w-full p-3.5 rounded-2xl bg-slate-50 border border-slate-200 font-black text-[11px] uppercase tracking-wide focus:outline-none focus:border-emerald-500 text-center italic">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="closeTxModal()" class="bg-slate-100 p-4 rounded-2xl font-black text-[10px] uppercase text-slate-500 btn-tap">Cancel</button>
+                <button onclick="executeSupabaseTx()" class="bg-emerald-600 text-white p-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-700/20 btn-tap">Confirm</button>
+            </div>
+        </div>
+    </div>
+
  <script>
     let logs = JSON.parse(localStorage.getItem('chem_final_v16')) || [];
     let chemicals = [
-    { id: 'hydro', name: 'Hydrochloric Acid', unit: 'Cby', balance: 50, alert: 10, image: 'hydrologic-acid.png' },
-    { id: 'caustic', name: 'Caustic Soda', unit: 'Cby', balance: 50, alert: 10, image: 'caustic.png' },
-    { id: 'chlorine', name: 'Chlorine', unit: 'Cby', balance: 40, alert: 10, image: 'chlorine.png' },
-    { id: 'alum', name: 'Aluminium Sulphate', unit: 'kg', balance: 250, alert: 50, image: 'aluminium.png' },
-    { id: 'polymer', name: 'Polymer', unit: 'kg', balance: 100, alert: 25, image: 'polymer.png' },
-    { id: 'amphos', name: 'Ammonium Phosphate', unit: 'kg', balance: 250, alert: 50, image: 'ammonium.png' }
-];
+        { id: 'hydro', name: 'Hydrochloric Acid', unit: 'Cby', balance: 50, alert: 10, image: 'hydrologic-acid.png' },
+        { id: 'caustic', name: 'Caustic Soda', unit: 'Cby', balance: 50, alert: 10, image: 'caustic.png' },
+        { id: 'chlorine', name: 'Chlorine', unit: 'Cby', balance: 40, alert: 10, image: 'chlorine.png' },
+        { id: 'alum', name: 'Aluminium Sulphate', unit: 'kg', balance: 250, alert: 50, image: 'aluminium.png' },
+        { id: 'polymer', name: 'Polymer', unit: 'kg', balance: 100, alert: 25, image: 'polymer.png' },
+        { id: 'amphos', name: 'Ammonium Phosphate', unit: 'kg', balance: 250, alert: 50, image: 'ammonium.png' }
+    ];
 
     let activeTab = 'OUT';
     let currentArea = null;
+    let selectedQtys = {};
+    let activeTxChemId = null;
 
     function getToday() { return new Date().toISOString().split('T')[0]; }
 
+    // Gumagana pareho sa local cache at handa para sa database integration
     function init() {
         document.getElementById('display-date').innerText = `${new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`;
         const savedStock = JSON.parse(localStorage.getItem('chem_v16_stock'));
@@ -156,94 +202,197 @@
         updateNotifBadge();
     }
 
-    // --- MAIN ACTION LOGIC ---
-
+    // --- NEW RENDER & COUNTER LOGIC ---
     function renderChems() {
-    document.getElementById('chem-grid').innerHTML = chemicals.map(c => {
-        let tapQty = (c.id === 'alum') ? 25 : 1;
-        // Check kung low stock para sa kulay ng badge
-        let badgeColor = c.balance <= c.alert ? 'bg-red-600' : 'bg-emerald-600';
+        document.getElementById('chem-grid').innerHTML = chemicals.map(c => {
+            if (selectedQtys[c.id] === undefined) {
+                selectedQtys[c.id] = 0;
+            }
 
-        return `
-            <div class="relative bg-white rounded-[2rem] shadow-md border border-emerald-50 overflow-hidden flex flex-col">
-                
-                <button onclick="tapSubtract('${c.id}')" class="btn-tap relative w-full pt-6 pb-2 px-4 flex flex-col items-center">
+            let currentQty = selectedQtys[c.id];
+            let isLowStock = c.balance <= c.alert;
+            let badgeColor = isLowStock ? 'bg-red-500 text-white' : 'bg-emerald-600 text-white';
+            let cardAlertStyle = isLowStock ? 'border-red-200/60 shadow-red-500/5' : 'border-white/60 shadow-emerald-900/5';
+            let badgeVisibility = currentQty > 0 ? 'scale-100 opacity-100' : 'scale-75 opacity-0 pointer-events-none';
+
+            return `
+                <div class="glass-card relative rounded-[2.5rem] p-4 flex flex-col shadow-xl ${cardAlertStyle} overflow-hidden">
                     
-                    <div class="absolute top-3 right-3 ${badgeColor} text-white px-3 py-1 rounded-full text-[12px] font-black shadow-lg z-10">
-                        ${c.balance} <span class="text-[8px] font-normal uppercase">${c.unit}</span>
+                    <!-- Warehouse Current Stock Status Header -->
+                    <div class="flex justify-between items-center w-full mb-2 px-1">
+                        <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Stock</span>
+                        <span class="text-[10px] font-black ${isLowStock ? 'text-red-600 animate-pulse' : 'text-emerald-700'}">
+                            ${c.balance} <span class="text-[7px] font-bold text-slate-400 uppercase">${c.unit}</span>
+                        </span>
                     </div>
 
-                    <div class="w-full h-32 flex items-center justify-center mb-2">
-                        <img src="assets/${c.image}" alt="${c.name}" 
-                             class="max-w-full max-h-full object-contain drop-shadow-xl transition-transform duration-300 hover:scale-110">
+                    <!-- Layout Container with Floating Badge Overlay Indicator -->
+                    <div class="relative w-full h-24 flex items-center justify-center mb-2 bg-white/40 rounded-2xl p-2 border border-white/20">
+                        <div id="badge-${c.id}" class="absolute -top-1.5 -right-1.5 ${badgeColor} text-[11px] font-black px-2.5 py-1 rounded-full shadow-md z-30 transition-all duration-300 transform ${badgeVisibility}">
+                            +${currentQty}
+                        </div>
+                        <img src="assets/${c.image}" alt="${c.name}" class="max-w-full max-h-full object-contain drop-shadow-md">
                     </div>
 
-                    <div class="w-full text-center mt-2">
-                        <h3 class="text-[10px] font-black uppercase text-emerald-900 leading-tight tracking-tighter mb-1 h-6 flex items-center justify-center">
+                    <!-- Label Core Engine Description -->
+                    <div class="w-full text-center px-1 mb-3">
+                        <h3 class="text-[10px] font-black uppercase text-emerald-950 leading-tight tracking-tighter line-clamp-1">
                             ${c.name}
                         </h3>
-                        ${c.id === 'alum' ? '<span class="text-[7px] font-bold text-orange-400 uppercase italic leading-none">-25kg per tap</span>' : '<span class="text-[7px] font-bold text-emerald-300 uppercase italic leading-none">-1 unit per tap</span>'}
+                        <span class="text-[7px] font-bold text-slate-400 uppercase tracking-wide">
+                            Unit: ${c.unit}
+                        </span>
                     </div>
-                </button>
 
-                <button onclick="correctionReturn('${c.id}')" 
-                        class="w-full py-2 bg-slate-50 border-t border-slate-100 text-[8px] font-black text-slate-400 uppercase tracking-widest active:bg-orange-100 active:text-orange-600 transition-colors">
-                    Return ${tapQty} ${c.unit}
-                </button>
-            </div>
-        `;
-    }).join('');
-}
-    function tapSubtract(chemId) {
-    const chem = chemicals.find(c => c.id === chemId);
-    let qty = (chemId === 'alum') ? 25 : 1;
+                    <!-- Instant Interactive Control System Layout Component -->
+                    <div class="grid grid-cols-3 bg-white/80 border border-slate-100 rounded-2xl items-center overflow-hidden mb-3 p-0.5 shadow-inner">
+                        <button onclick="adjustQty('${c.id}', -1)" class="py-2.5 flex items-center justify-center text-slate-500 hover:bg-slate-50 active:bg-slate-100 text-xs font-black btn-tap rounded-xl transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                        
+                        <div id="display-qty-${c.id}" class="text-center font-black text-[13px] text-emerald-950 tracking-tight select-none">
+                            ${currentQty}
+                        </div>
+                        
+                        <button onclick="adjustQty('${c.id}', 1)" class="py-2.5 flex items-center justify-center text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 text-xs font-black btn-tap rounded-xl transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                    </div>
 
-    // CONFIRMATION POPUP
-    const confirmTap = confirm(`CONFIRM USAGE:\n\nChemical: ${chem.name.toUpperCase()}\nAmount: -${qty} ${chem.unit}\n\nIpagpapatuloy ba?`);
-    
-    if(!confirmTap) return; // Cancel kung pinindot ang Cancel
+                    <!-- Mechanical Validation Core Dispatcher Trigger -->
+                    <button onclick="openTxConfirmation('${c.id}')" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[9px] font-black uppercase tracking-wider shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-all btn-tap">
+                        Submit Transaction
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
 
-    if(chem.balance < qty) return alert("Insufficient Stock!");
-
-    chem.balance -= qty;
-    logs.unshift({
-        id: Date.now(), 
-        date: getToday(), 
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 
-        chemId: chem.id, 
-        chemName: chem.name, 
-        area: currentArea, 
-        qty: qty, 
-        unit: chem.unit, 
-        type: 'OUT'
-    });
-
-    saveData();
-    renderChems();
-    updateNotifBadge();
-}
-
-    // NEW LOGIC: Correction function (pwedeng i-trigger via long press or supervisor)
-   function correctionReturn(chemId) {
-    const chem = chemicals.find(c => c.id === chemId);
-    let qty = (chemId === 'alum') ? 25 : 1;
-    
-    if(confirm(`CORRECTION:\nIabalik ang ${qty} ${chem.unit} sa stock ng ${chem.name}?`)) {
-        chem.balance += qty;
+    function adjustQty(chemId, change) {
+        const chem = chemicals.find(c => c.id === chemId);
+        let targetElement = document.getElementById(`display-qty-${chemId}`);
+        let badgeElement = document.getElementById(`badge-${chemId}`);
         
-        // Hanapin ang pinaka-latest na entry ng chemical na ito at burahin
-        const index = logs.findIndex(l => l.chemId === chemId && l.type === 'OUT');
-        if (index > -1) {
-            logs.splice(index, 1);
+        let newQty = (selectedQtys[chemId] || 0) + change;
+        if (newQty < 0) return;
+        
+        if (newQty > chem.balance) {
+            alert(`Cannot exceed available stock balance (${chem.balance} ${chem.unit})`);
+            return;
         }
         
-        saveData();
-        renderChems();
-        updateNotifBadge();
-        alert("Stock Corrected!");
+        selectedQtys[chemId] = newQty;
+        
+        if (targetElement) {
+            targetElement.innerText = newQty;
+            targetElement.classList.remove('qty-bounce');
+            void targetElement.offsetWidth;
+            targetElement.classList.add('qty-bounce');
+        }
+        
+        if (badgeElement) {
+            badgeElement.innerText = `+${newQty}`;
+            if (newQty > 0) {
+                badgeElement.classList.remove('scale-75', 'opacity-0', 'pointer-events-none');
+                badgeElement.classList.add('scale-100', 'opacity-100');
+            } else {
+                badgeElement.classList.remove('scale-100', 'opacity-100');
+                badgeElement.classList.add('scale-75', 'opacity-0', 'pointer-events-none');
+            }
+        }
     }
-}
 
+    function openTxConfirmation(chemId) {
+        const qty = selectedQtys[chemId] || 0;
+        if (qty <= 0) {
+            alert("Please adjust quantity higher than 0 before submission parsing.");
+            return;
+        }
+        
+        const chem = chemicals.find(c => c.id === chemId);
+        activeTxChemId = chemId;
+        
+        document.getElementById('tx-modal-msg').innerHTML = `Confirm deduction of <span class="text-emerald-600 font-black text-sm underline">${qty}</span> units from <span class="font-bold text-slate-800">${chem.name.toUpperCase()}</span> inventory?`;
+        document.getElementById('tx-operator').value = "";
+        document.getElementById('tx-confirm-modal').classList.remove('hidden');
+    }
+
+    function closeTxModal() {
+        document.getElementById('tx-confirm-modal').classList.add('hidden');
+        activeTxChemId = null;
+    }
+
+    async function executeSupabaseTx() {
+        const operatorName = document.getElementById('tx-operator').value.trim().toUpperCase();
+        if (!operatorName) {
+            alert("Operator execution parameter signature required.");
+            return;
+        }
+        
+        const chemId = activeTxChemId;
+        const deductionQty = selectedQtys[chemId];
+        const chem = chemicals.find(c => c.id === chemId);
+        
+        if (chem.balance < deductionQty) {
+            alert("Error: Critical inventory storage boundary breach.");
+            closeTxModal();
+            return;
+        }
+
+        const txDate = getToday();
+        const txTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        try {
+            /* 
+            // HOOK FOR CLOUD SYNC CONFIGURATION VIA SUPABASE CLIENT:
+            const { data, error } = await supabase
+                .from('chemical_inventory_transactions')
+                .insert([
+                    { 
+                        area_origin: currentArea,
+                        chemical_identity: chemId,
+                        chemical_title: chem.name,
+                        dispatched_units: deductionQty,
+                        metric_unit: chem.unit,
+                        operator_signature: operatorName,
+                        transaction_nature: 'OUT',
+                        timestamp_marker: new Date().toISOString()
+                    }
+                ]);
+            if (error) throw error;
+            */
+            
+            chem.balance -= deductionQty;
+            
+            logs.unshift({
+                id: Date.now(), 
+                date: txDate, 
+                time: txTime, 
+                chemId: chem.id, 
+                chemName: chem.name, 
+                area: currentArea, 
+                qty: deductionQty, 
+                unit: chem.unit, 
+                operator: operatorName,
+                type: 'OUT'
+            });
+
+            saveData();
+            selectedQtys[chemId] = 0;
+            
+            renderChems();
+            updateNotifBadge();
+            closeTxModal();
+            
+            alert("Log updated successfully.");
+
+        } catch (err) {
+            console.error(err);
+            alert("Database connection sync dropped. Verify storage cluster connectivity status.");
+        }
+    }
+
+    // --- VISOR PANEL BACKEND DECK MODULES ---
     function adminAddStock() {
         const id = document.getElementById('admin-chem-select').value;
         const qtyInput = parseFloat(document.getElementById('admin-qty').value);
@@ -252,8 +401,6 @@
         if(!qtyInput || qtyInput <= 0 || !rcv) return alert("Missing fields!");
         
         const chem = chemicals.find(c => c.id === id);
-        
-        // MAGIC LOGIC: Kapag Alum ang dinala (ex: 150 sacks), * 25kg agad.
         let finalAdd = (id === 'alum') ? qtyInput * 25 : qtyInput;
         
         chem.balance += finalAdd;
@@ -264,7 +411,7 @@
             time: new Date().toLocaleTimeString(), 
             chemId: id, 
             chemName: chem.name, 
-            qty: qtyInput, // Nilolog natin yung count (bags/units)
+            qty: qtyInput, 
             totalKg: finalAdd,
             receivedBy: rcv, 
             unit: (id === 'alum') ? 'Sacks' : chem.unit, 
@@ -280,97 +427,92 @@
         alert(`Successfully added ${qtyInput} ${id === 'alum' ? 'sacks' : 'units'}`);
     }
 
-    // --- VISOR PANEL & UI LOGIC (Binalik lahat ng dati mong functions) ---
-
     function applyFilters() {
-    const container = document.getElementById('admin-content-area');
-    const dt = document.getElementById('f-date').value;
-    const currentMonth = new Date().toISOString().slice(0, 7); 
-    let d = logs.filter(l => l.type === activeTab);
+        const container = document.getElementById('admin-content-area');
+        const dt = document.getElementById('f-date').value;
+        const currentMonth = new Date().toISOString().slice(0, 7); 
+        let d = logs.filter(l => l.type === activeTab);
 
-    if(dt) d = d.filter(l => l.date === dt);
-    else d = d.filter(l => l.date.startsWith(currentMonth));
+        if(dt) d = d.filter(l => l.date === dt);
+        else d = d.filter(l => l.date.startsWith(currentMonth));
 
-    if (activeTab === 'OUT') {
-        const ch = document.getElementById('f-chem').value;
-        const ar = document.getElementById('f-area').value;
-        if(ch !== 'ALL') d = d.filter(l => l.chemId === ch);
-        if(ar !== 'ALL') d = d.filter(l => l.area === ar);
-        
-        container.innerHTML = `
-            <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
-            <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
-                <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chem</span><span>Area</span><span class="text-right">Qty</span><span class="text-right">Action</span></div>
-                ${d.length ? d.map(l => `
-                    <div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[10px] font-bold uppercase last:border-0 items-center">
-                        <span class="leading-tight">${l.chemName}<br><span class="text-[7px] text-emerald-300 font-normal">${l.time}</span></span>
-                        <span class="text-emerald-500 italic">${l.area}</span>
-                        <span class="text-right font-black text-emerald-900">-${l.qty}</span>
-                        <div class="text-right"><button onclick="deleteUsage(${l.id})" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase active:bg-red-500 active:text-white">Undo</button></div>
-                    </div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black italic">No Records</div>'}
-            </div>`;
-    } else {
-        const rcv = document.getElementById('f-rcv').value.toUpperCase();
-        if(rcv) d = d.filter(l => l.receivedBy.toUpperCase().includes(rcv));
+        if (activeTab === 'OUT') {
+            const ch = document.getElementById('f-chem').value;
+            const ar = document.getElementById('f-area').value;
+            if(ch !== 'ALL') d = d.filter(l => l.chemId === ch);
+            if(ar !== 'ALL') d = d.filter(l => l.area === ar);
+            
+            container.innerHTML = `
+                <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
+                <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
+                    <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chem</span><span>Area</span><span class="text-right">Qty</span><span class="text-right">Action</span></div>
+                    ${d.length ? d.map(l => `
+                        <div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[10px] font-bold uppercase last:border-0 items-center">
+                            <span class="leading-tight">${l.chemName}<br><span class="text-[7px] text-emerald-300 font-normal">${l.time}</span></span>
+                            <span class="text-emerald-500 italic">${l.area}</span>
+                            <span class="text-right font-black text-emerald-900">-${l.qty}</span>
+                            <div class="text-right"><button onclick="deleteUsage(${l.id})" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase active:bg-red-500 active:text-white">Undo</button></div>
+                        </div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black italic">No Records</div>'}
+                </div>`;
+        } else {
+            const rcv = document.getElementById('f-rcv').value.toUpperCase();
+            if(rcv) d = d.filter(l => l.receivedBy.toUpperCase().includes(rcv));
 
-        container.innerHTML = `
-            <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
-            <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
-                <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chem/By</span><span>Qty</span><span>Total</span><span class="text-right">Action</span></div>
-                ${d.length ? d.map(l => `
-                    <div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[9px] font-bold uppercase last:border-0 items-center">
-                        <span class="leading-tight">${l.chemName}<br><span class="text-[7px] text-emerald-400 font-normal italic">By: ${l.receivedBy}</span></span>
-                        <span class="text-emerald-700">+${l.qty} ${l.unit}</span>
-                        <span class="font-black text-emerald-900">${l.totalKg || l.qty}kg</span>
-                        <div class="text-right"><button onclick="deleteDelivery(${l.id})" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase active:bg-red-500 active:text-white italic">Del</button></div>
-                    </div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black">No Deliveries</div>'}
-            </div>`;
-    }
-}
-    // DELETE USAGE: Ibabalik ang stock
-function deleteUsage(logId) {
-    if(!confirm("CORRECTION: Delete this usage and RETURN stock to inventory?")) return;
-    const logIndex = logs.findIndex(l => l.id === logId);
-    if(logIndex === -1) return;
-    
-    const logEntry = logs[logIndex];
-    const chem = chemicals.find(c => c.id === logEntry.chemId);
-    if(chem) chem.balance += logEntry.qty; // Ibalik ang binawas
-
-    logs.splice(logIndex, 1);
-    saveData();
-    applyFilters();
-    renderChems();
-    updateNotifBadge();
-    alert("Usage undone. Stock restored!");
-}
-
-// DELETE DELIVERY: Ibabawas ang stock na maling nadagdag
-function deleteDelivery(logId) {
-    if(!confirm("CORRECTION: Remove this delivery and DEDUCT from stock?")) return;
-    const logIndex = logs.findIndex(l => l.id === logId);
-    if(logIndex === -1) return;
-    
-    const logEntry = logs[logIndex];
-    const chem = chemicals.find(c => c.id === logEntry.chemId);
-    
-    // Kunin kung magkano ang dapat ibawas (yung totalKg na na-record)
-    let amountToDeduct = logEntry.totalKg || logEntry.qty;
-
-    if(chem) {
-        if(chem.balance < amountToDeduct) {
-            if(!confirm("Warning: Stock is lower than the delivery amount. Balance will go negative. Proceed?")) return;
+            container.innerHTML = `
+                <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">${dt ? 'Date: '+dt : 'Monthly View: '+currentMonth}</p>
+                <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
+                    <div class="grid grid-cols-4 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400"><span>Chem/By</span><span>Qty</span><span>Total</span><span class="text-right">Action</span></div>
+                    ${d.length ? d.map(l => `
+                        <div class="grid grid-cols-4 p-4 border-b border-emerald-50 text-[9px] font-bold uppercase last:border-0 items-center">
+                            <span class="leading-tight">${l.chemName}<br><span class="text-[7px] text-emerald-400 font-normal italic">By: ${l.receivedBy}</span></span>
+                            <span class="text-emerald-700">+${l.qty} ${l.unit}</span>
+                            <span class="font-black text-emerald-900">${l.totalKg || l.qty}kg</span>
+                            <div class="text-right"><button onclick="deleteDelivery(${l.id})" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase active:bg-red-500 active:text-white italic">Del</button></div>
+                        </div>`).join('') : '<div class="p-10 text-center text-emerald-200 text-[10px] font-black">No Deliveries</div>'}
+                </div>`;
         }
-        chem.balance -= amountToDeduct;
     }
 
-    logs.splice(logIndex, 1);
-    saveData();
-    applyFilters();
-    renderChems();
-    updateNotifBadge();
-    alert("Delivery record removed. Stock adjusted!");
-}
+    function deleteUsage(logId) {
+        if(!confirm("CORRECTION: Delete this usage and RETURN stock to inventory?")) return;
+        const logIndex = logs.findIndex(l => l.id === logId);
+        if(logIndex === -1) return;
+        
+        const logEntry = logs[logIndex];
+        const chem = chemicals.find(c => c.id === logEntry.chemId);
+        if(chem) chem.balance += logEntry.qty;
+
+        logs.splice(logIndex, 1);
+        saveData();
+        applyFilters();
+        renderChems();
+        updateNotifBadge();
+        alert("Usage undone. Stock restored!");
+    }
+
+    function deleteDelivery(logId) {
+        if(!confirm("CORRECTION: Remove this delivery and DEDUCT from stock?")) return;
+        const logIndex = logs.findIndex(l => l.id === logId);
+        if(logIndex === -1) return;
+        
+        const logEntry = logs[logIndex];
+        const chem = chemicals.find(c => c.id === logEntry.chemId);
+        let amountToDeduct = logEntry.totalKg || logEntry.qty;
+
+        if(chem) {
+            if(chem.balance < amountToDeduct) {
+                if(!confirm("Warning: Stock is lower than delivery amount. Balance will go negative. Proceed?")) return;
+            }
+            chem.balance -= amountToDeduct;
+        }
+
+        logs.splice(logIndex, 1);
+        saveData();
+        applyFilters();
+        renderChems();
+        updateNotifBadge();
+        alert("Delivery record removed. Stock adjusted!");
+    }
 
     function renderFilterBar() {
         const bar = document.getElementById('filter-bar');
@@ -405,7 +547,22 @@ function deleteDelivery(logId) {
     }
 
     function setLogTab(t) { activeTab = t; ['OUT', 'IN', 'STATS'].forEach(id => document.getElementById('tab-'+id).classList.toggle('tab-active', id === t)); renderFilterBar(); if(t !== 'STATS') applyFilters(); else renderStats('today'); }
-    function showShiftSummary() { const h = new Date().getHours(); const shift = (h >= 6 && h < 18) ? "DS" : "NS"; const todayLogs = logs.filter(l => l.date === getToday()); const usage = todayLogs.filter(l => l.type === 'OUT'); const delivery = todayLogs.filter(l => l.type === 'IN'); let res = `📌 SHIFT REPORT (${shift})\nDate: ${getToday()}\n\n--- USAGE ---\n`; if(usage.length) chemicals.forEach(c => { const used = usage.filter(l => l.chemId === c.id).reduce((acc, curr) => acc + curr.qty, 0); if(used > 0) res += `🔹 ${c.name}: ${used} ${c.unit}\n`; }); else res += `(No usage)\n`; res += `\n--- DELIVERIES ---\n`; if(delivery.length) delivery.forEach(d => { res += `📦 ${d.chemName}: +${d.qty} (${d.receivedBy})\n`; }); else res += `(No deliveries)\n`; document.getElementById('summary-text').innerText = res; document.getElementById('summary-modal').style.display = 'flex'; document.getElementById('summary-badge').classList.add('hidden'); }
+    
+    function showShiftSummary() { 
+        const h = new Date().getHours(); 
+        const shift = (h >= 6 && h < 18) ? "DS" : "NS"; 
+        const todayLogs = logs.filter(l => l.date === getToday()); 
+        const usage = todayLogs.filter(l => l.type === 'OUT'); 
+        const delivery = todayLogs.filter(l => l.type === 'IN'); 
+        let res = `📌 SHIFT REPORT (${shift})\nDate: ${getToday()}\n\n--- USAGE ---\n`; 
+        if(usage.length) chemicals.forEach(c => { const used = usage.filter(l => l.chemId === c.id).reduce((acc, curr) => acc + curr.qty, 0); if(used > 0) res += `🔹 ${c.name}: ${used} ${c.unit}\n`; }); else res += `(No usage)\n`; 
+        res += `\n--- DELIVERIES ---\n`; 
+        if(delivery.length) delivery.forEach(d => { res += `📦 ${d.chemName}: +${d.qty} (${d.receivedBy})\n`; }); else res += `(No deliveries)\n`; 
+        document.getElementById('summary-text').innerText = res; 
+        document.getElementById('summary-modal').style.display = 'flex'; 
+        document.getElementById('summary-badge').classList.add('hidden'); 
+    }
+    
     function selectArea(a) { currentArea = a; document.getElementById('area-screen').classList.add('hidden'); document.getElementById('chem-screen').classList.remove('hidden'); document.getElementById('selected-area-label').innerText = a; renderChems(); }
     function goBack() { document.getElementById('area-screen').classList.remove('hidden'); document.getElementById('chem-screen').classList.add('hidden'); }
     function openAdmin() { document.getElementById('admin-dashboard').style.display='flex'; document.getElementById('admin-dashboard').classList.remove('admin-hidden'); setLogTab('OUT'); }
