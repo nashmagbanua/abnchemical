@@ -4,13 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <title>ABN-Chemical-Logbook</title>
+    <title>ABN Chemical Logbook</title>
 
     <link rel="apple-touch-icon" sizes="180x180" href="assets/abnlogo.svg">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/abnlogo.ico">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/abnlogo.ico">
 
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- SheetJS / Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
     <style>
         .btn-tap:active {
@@ -115,40 +119,69 @@
             }
         }
 
+        .toast {
+            animation:
+                toastIn 0.25s ease-out,
+                toastOut 0.25s ease-in 3.3s forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(-15px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateY(-15px) scale(0.95);
+            }
+        }
+
         @media print {
             body {
                 background: white !important;
             }
 
-            body * {
-                visibility: hidden !important;
-            }
-
-            #print-report,
-            #print-report * {
-                visibility: visible !important;
-            }
-
-            #print-report {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                background: white !important;
-                color: black !important;
-                padding: 20px !important;
-            }
-
-            .no-print {
+            body > * {
                 display: none !important;
             }
+
+            #print-area {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                color: black !important;
+                background: white !important;
+            }
+        }
+
+        #print-area {
+            display: none;
         }
     </style>
 </head>
 
 <body class="bg-[#f0f9f6] text-slate-900 font-sans min-h-screen">
 
-    <!-- HEADER -->
+    <!-- ========================================= -->
+    <!-- TOAST -->
+    <!-- ========================================= -->
+
+    <div id="toast-container"
+         class="fixed top-4 left-4 right-4 z-[30000] flex flex-col items-center gap-2 pointer-events-none">
+    </div>
+
+    <!-- ========================================= -->
+    <!-- TOP BAR -->
+    <!-- ========================================= -->
+
     <div class="p-6 bg-white/80 backdrop-blur-md border-b border-emerald-100 flex justify-between items-center sticky top-0 z-40 shadow-sm">
 
         <div>
@@ -156,10 +189,20 @@
                 CHEMICAL<span class="text-emerald-500">LOGBOOK</span>
             </h1>
 
-            <p
-                id="display-date"
-                class="text-[9px] font-black text-emerald-400 tracking-widest uppercase mt-1">
+            <p id="display-date"
+               class="text-[9px] font-black text-emerald-400 tracking-widest uppercase mt-1">
             </p>
+
+            <div class="flex items-center gap-1 mt-1">
+                <span id="connection-dot"
+                      class="w-2 h-2 rounded-full bg-slate-300">
+                </span>
+
+                <span id="connection-text"
+                      class="text-[7px] font-black uppercase text-slate-400">
+                    Connecting...
+                </span>
+            </div>
         </div>
 
         <div class="flex items-center space-x-2">
@@ -172,14 +215,14 @@
                     class="bg-emerald-50 text-emerald-700 p-2.5 rounded-full btn-tap border border-emerald-100">
 
                     <svg xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round">
+                         width="20"
+                         height="20"
+                         viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="2.5"
+                         stroke-linecap="round"
+                         stroke-linejoin="round">
 
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                         <polyline points="14 2 14 8 20 8"/>
@@ -190,9 +233,8 @@
 
                 </button>
 
-                <div
-                    id="summary-badge"
-                    class="hidden absolute -top-1 -right-1 bg-emerald-500 w-3 h-3 rounded-full border-2 border-white">
+                <div id="summary-badge"
+                     class="hidden absolute -top-1 -right-1 bg-emerald-500 w-3 h-3 rounded-full border-2 border-white">
                 </div>
 
             </div>
@@ -206,9 +248,8 @@
                     Visor Panel
                 </button>
 
-                <div
-                    id="notif-badge"
-                    class="hidden absolute -top-2 -right-1 bg-red-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white badge-pulse">
+                <div id="notif-badge"
+                     class="hidden absolute -top-2 -right-1 bg-red-600 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white badge-pulse">
                     0
                 </div>
 
@@ -218,59 +259,135 @@
     </div>
 
 
+    <!-- ========================================= -->
     <!-- MAIN UI -->
+    <!-- ========================================= -->
+
     <div id="main-ui">
 
         <!-- AREA SCREEN -->
-        <div id="area-screen" class="p-6 grid grid-cols-2 gap-4">
+
+        <div id="area-screen"
+             class="p-6 grid grid-cols-2 gap-4">
 
             <h2 class="col-span-2 text-[10px] font-black text-emerald-800/40 uppercase tracking-[0.3em] mb-4 italic text-center">
                 Select Plant Area
             </h2>
 
+            <!-- BOILER -->
+
             <button
                 onclick="selectArea('BOILER')"
                 class="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-emerald-50 btn-tap flex flex-col items-center">
 
-                <span class="text-3xl">🔥</span>
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="32"
+                     height="32"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="#065f46"
+                     stroke-width="2.5"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
+
+                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+                </svg>
 
                 <span class="block font-black text-[11px] uppercase mt-3 tracking-tighter text-emerald-900">
                     Boiler
                 </span>
+
             </button>
+
+
+            <!-- WTP -->
 
             <button
                 onclick="selectArea('WTP')"
                 class="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-emerald-50 btn-tap flex flex-col items-center">
 
-                <span class="text-3xl">💧</span>
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="32"
+                     height="32"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="#065f46"
+                     stroke-width="2.5"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
+
+                    <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+                </svg>
 
                 <span class="block font-black text-[11px] uppercase mt-3 tracking-tighter text-emerald-900">
                     WTP
                 </span>
+
             </button>
+
+
+            <!-- WWTP -->
 
             <button
                 onclick="selectArea('WWTP')"
                 class="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-emerald-50 btn-tap flex flex-col items-center">
 
-                <span class="text-3xl">♻️</span>
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="32"
+                     height="32"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="#065f46"
+                     stroke-width="2.5"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
+
+                    <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/>
+                    <path d="M7 2v20"/>
+                    <path d="M17 2v20"/>
+                    <path d="M2 12h20"/>
+                    <path d="M2 7h5"/>
+                    <path d="M2 17h5"/>
+                    <path d="M17 17h5"/>
+                    <path d="M17 7h5"/>
+
+                </svg>
 
                 <span class="block font-black text-[11px] uppercase mt-3 tracking-tighter text-emerald-900">
                     WWTP
                 </span>
+
             </button>
+
+
+            <!-- OTHERS -->
 
             <button
                 onclick="selectArea('OTHERS')"
                 class="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-emerald-50 btn-tap flex flex-col items-center">
 
-                <span class="text-3xl">📦</span>
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="32"
+                     height="32"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="#065f46"
+                     stroke-width="2.5"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
+
+                    <path d="m12 2 9 5.15v9.7L12 22l-9-5.15v-9.7L12 2Z"/>
+                    <path d="m3.3 7 8.7 5 8.7-5"/>
+                    <path d="M12 22V12"/>
+
+                </svg>
 
                 <span class="block font-black text-[11px] uppercase mt-3 tracking-tighter text-emerald-900">
                     Others
                 </span>
+
             </button>
+
 
             <footer class="col-span-2 text-center py-10">
 
@@ -286,12 +403,13 @@
 
 
         <!-- CHEMICAL SCREEN -->
-        <div id="chem-screen" class="p-6 hidden">
+
+        <div id="chem-screen"
+             class="p-6 hidden">
 
             <div class="flex justify-between items-center mb-6">
 
-                <h2
-                    id="selected-area-label"
+                <h2 id="selected-area-label"
                     class="text-lg font-black text-emerald-900 uppercase italic">
                 </h2>
 
@@ -303,25 +421,28 @@
 
             </div>
 
-            <div id="chem-grid" class="grid grid-cols-2 gap-4"></div>
+            <div id="chem-grid"
+                 class="grid grid-cols-2 gap-4">
+            </div>
 
         </div>
 
     </div>
 
 
+    <!-- ========================================= -->
     <!-- VISOR PANEL -->
-    <div
-        id="admin-dashboard"
-        class="admin-hidden fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden">
+    <!-- ========================================= -->
+
+    <div id="admin-dashboard"
+         class="admin-hidden fixed inset-0 bg-white z-[100] flex flex-col overflow-hidden">
 
         <div class="p-6 border-b border-emerald-100 bg-white shrink-0">
 
             <div class="flex justify-between items-center mb-4">
 
                 <h2 class="font-black text-xl italic uppercase text-emerald-900 tracking-tighter">
-                    VISOR
-                    <span class="text-emerald-500">PANEL</span>
+                    VISOR <span class="text-emerald-500">PANEL</span>
                 </h2>
 
                 <div class="flex space-x-2">
@@ -344,9 +465,9 @@
 
 
             <!-- DELIVERY FORM -->
-            <div
-                id="delivery-form"
-                class="hidden bg-emerald-50 p-4 rounded-3xl mb-4 border border-emerald-100">
+
+            <div id="delivery-form"
+                 class="hidden bg-emerald-50 p-4 rounded-3xl mb-4 border border-emerald-100">
 
                 <div class="grid grid-cols-2 gap-2 mb-2">
 
@@ -381,6 +502,7 @@
 
 
             <!-- TABS -->
+
             <div class="flex border-b border-emerald-50 text-[10px] font-black uppercase tracking-widest text-emerald-300">
 
                 <button
@@ -409,26 +531,51 @@
         </div>
 
 
-        <!-- FILTER -->
-        <div
-            id="filter-bar"
-            class="p-4 bg-[#f0f9f6] border-b border-emerald-100 space-y-2">
+        <!-- FILTER BAR -->
+
+        <div id="filter-bar"
+             class="p-4 bg-[#f0f9f6] border-b border-emerald-100 space-y-2">
         </div>
 
 
-        <!-- ADMIN CONTENT -->
-        <div
-            id="admin-content-area"
-            class="flex-1 overflow-y-auto p-4 bg-[#f0f9f6]">
+        <!-- ADMIN ACTION BAR -->
+
+        <div class="px-4 pt-3 bg-[#f0f9f6]">
+
+            <div class="grid grid-cols-2 gap-2">
+
+                <button
+                    onclick="printCurrentReport()"
+                    class="bg-white border border-emerald-200 text-emerald-700 p-3 rounded-2xl font-black text-[9px] uppercase shadow-sm btn-tap">
+                    🖨️ Print Report
+                </button>
+
+                <button
+                    onclick="exportCurrentExcel()"
+                    class="bg-emerald-700 text-white p-3 rounded-2xl font-black text-[9px] uppercase shadow-sm btn-tap">
+                    📊 Export Excel
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- CONTENT -->
+
+        <div id="admin-content-area"
+             class="flex-1 overflow-y-auto p-4 bg-[#f0f9f6]">
         </div>
 
     </div>
 
 
+    <!-- ========================================= -->
     <!-- SHIFT SUMMARY -->
-    <div
-        id="summary-modal"
-        class="hidden fixed inset-0 flex items-center justify-center p-6 backdrop-blur-sm bg-emerald-900/40">
+    <!-- ========================================= -->
+
+    <div id="summary-modal"
+         class="hidden fixed inset-0 flex items-center justify-center p-6 backdrop-blur-sm bg-emerald-900/40">
 
         <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative border-t-8 border-emerald-600">
 
@@ -436,12 +583,11 @@
                 Shift Summary
             </h3>
 
-            <div
-                id="summary-text"
-                class="bg-emerald-50 p-6 rounded-3xl text-[11px] font-bold text-emerald-800 mb-6 border border-emerald-100 whitespace-pre-wrap max-h-[350px] overflow-y-auto">
+            <div id="summary-text"
+                 class="bg-emerald-50 p-6 rounded-3xl text-[11px] font-bold text-emerald-800 mb-6 border border-emerald-100 whitespace-pre-wrap max-h-[350px] overflow-y-auto">
             </div>
 
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid grid-cols-2 gap-3">
 
                 <button
                     onclick="closeSummary()"
@@ -450,15 +596,9 @@
                 </button>
 
                 <button
-                    onclick="printReport()"
-                    class="bg-slate-800 text-white p-4 rounded-2xl font-black text-[10px] uppercase btn-tap">
-                    Print
-                </button>
-
-                <button
-                    onclick="exportCSV()"
+                    onclick="copyReport()"
                     class="bg-emerald-600 text-white p-4 rounded-2xl font-black text-[10px] uppercase shadow-lg btn-tap">
-                    Excel
+                    Copy Report
                 </button>
 
             </div>
@@ -468,27 +608,30 @@
     </div>
 
 
+    <!-- ========================================= -->
     <!-- TRANSACTION CONFIRMATION -->
-    <div
-        id="tx-confirm-modal"
-        class="hidden fixed inset-0 flex items-center justify-center p-6 backdrop-blur-md bg-emerald-950/40 z-[10000]">
+    <!-- ========================================= -->
+
+    <div id="tx-confirm-modal"
+         class="hidden fixed inset-0 flex items-center justify-center p-6 backdrop-blur-md bg-emerald-950/40 z-[10000]">
 
         <div class="bg-white/90 backdrop-blur-lg w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl border border-white/40 flex flex-col">
 
             <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mb-4 mx-auto text-emerald-600">
 
                 <svg xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="3"
-                    stroke-linecap="round"
-                    stroke-linejoin="round">
+                     width="24"
+                     height="24"
+                     viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="3"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
 
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                     <polyline points="22 4 12 14.01 9 11.01"/>
+
                 </svg>
 
             </div>
@@ -497,9 +640,8 @@
                 Confirm Deduction
             </h3>
 
-            <p
-                id="tx-modal-msg"
-                class="text-xs text-center text-slate-600 font-medium px-2 mb-4 leading-relaxed">
+            <p id="tx-modal-msg"
+               class="text-xs text-center text-slate-600 font-medium px-2 mb-4 leading-relaxed">
             </p>
 
             <div class="mb-4">
@@ -525,6 +667,7 @@
                 </button>
 
                 <button
+                    id="tx-confirm-btn"
                     onclick="executeSupabaseTx()"
                     class="bg-emerald-600 text-white p-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-700/20 btn-tap">
                     Confirm
@@ -537,340 +680,557 @@
     </div>
 
 
-    <!-- PRINT CONTAINER -->
-    <div id="print-report" class="hidden"></div>
+    <!-- ========================================= -->
+    <!-- PRINT AREA -->
+    <!-- ========================================= -->
+
+    <div id="print-area"></div>
 
 
 <script>
 
-/* ============================================================
+/* =========================================================
    SUPABASE CONFIGURATION
-   ============================================================ */
+   ========================================================= */
 
-const SUPABASE_URL =
-    "https://qbeacrpoyfacgmbzxjcu.supabase.co";
+const SUPABASE_URL = "https://qbeacrpoyfacgmbzxjcu.supabase.co";
 
 const SUPABASE_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFiZWFjcnBveWZhY2dtYnp4amN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg2NTM5NTIsImV4cCI6MjA2NDIyOTk1Mn0.6kfxKLJxidw4BcqsMJte61AtzydrTW-1ZJIJytiUBt4";
 
+/*
+ IMPORTANT:
+ Use only the Supabase anon/public key here.
+ Never use service_role key in this browser file.
+*/
 
-/* ============================================================
-   CHEMICAL MASTER
-   ============================================================ */
 
-let chemicals = [
-    {
-        id: "hydro",
-        name: "Hydrochloric Acid",
-        unit: "Cby",
-        balance: 0,
-        alert: 10,
-        image: "hydrologic-acid.png"
-    },
-    {
-        id: "caustic",
-        name: "Caustic Soda",
-        unit: "Cby",
-        balance: 0,
-        alert: 10,
-        image: "caustic.png"
-    },
-    {
-        id: "chlorine",
-        name: "Chlorine",
-        unit: "Cby",
-        balance: 0,
-        alert: 10,
-        image: "chlorine.png"
-    },
-    {
-        id: "alum",
-        name: "Aluminium Sulphate",
-        unit: "kg",
-        balance: 0,
-        alert: 50,
-        image: "aluminium.png"
-    },
-    {
-        id: "polymer",
-        name: "Polymer",
-        unit: "kg",
-        balance: 0,
-        alert: 25,
-        image: "polymer.png"
-    },
-    {
-        id: "amphos",
-        name: "Ammonium Phosphate",
-        unit: "kg",
-        balance: 0,
-        alert: 50,
-        image: "ammonium.png"
+/* =========================================================
+   SUPABASE REST HELPER
+   ========================================================= */
+
+async function supabaseRequest(
+    table,
+    options = {}
+) {
+
+    const {
+        method = "GET",
+        query = "",
+        body = null,
+        prefer = ""
+    } = options;
+
+    const url =
+        `${SUPABASE_URL}/rest/v1/${table}${query}`;
+
+    const headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json"
+    };
+
+    if (prefer) {
+        headers["Prefer"] = prefer;
     }
-];
 
-
-/* ============================================================
-   STATE
-   ============================================================ */
-
-let activeTab = "OUT";
-let currentArea = null;
-let selectedQtys = {};
-let activeTxChemId = null;
-let logs = [];
-let inventoryLoading = false;
-
-
-/* ============================================================
-   SUPABASE REQUEST HELPER
-   ============================================================ */
-
-async function supabaseRequest(endpoint, options = {}) {
-
-    const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/${endpoint}`,
-        {
-            method: options.method || "GET",
-
-            headers: {
-                "apikey": SUPABASE_KEY,
-                "Authorization": `Bearer ${SUPABASE_KEY}`,
-                "Content-Type": "application/json",
-                "Prefer": options.prefer || "return=representation",
-                ...(options.headers || {})
-            },
-
-            body: options.body
-                ? JSON.stringify(options.body)
-                : undefined
-        }
-    );
+    const response = await fetch(url, {
+        method,
+        headers,
+        body: body !== null
+            ? JSON.stringify(body)
+            : undefined
+    });
 
     const text = await response.text();
 
     let data = null;
 
-    try {
-        data = text ? JSON.parse(text) : null;
-    } catch {
-        data = text;
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch {
+            data = text;
+        }
     }
 
     if (!response.ok) {
 
         console.error(
-            "SUPABASE ERROR:",
+            "[Supabase]",
             response.status,
             data
         );
 
-        throw new Error(
+        const message =
             data?.message ||
+            data?.error_description ||
             data?.hint ||
             data?.details ||
-            `Supabase request failed (${response.status})`
-        );
+            `Supabase request failed (${response.status})`;
+
+        throw new Error(message);
     }
 
     return data;
 }
 
 
-/* ============================================================
-   DATE HELPERS
-   ============================================================ */
+/* =========================================================
+   APPLICATION STATE
+   ========================================================= */
+
+let inventoryRows = [];
+let logs = [];
+
+let activeTab = "OUT";
+let currentArea = null;
+let selectedQtys = {};
+let activeTxChemId = null;
+
+let isLoadingInventory = false;
+let isLoadingLogs = false;
+
+
+/* =========================================================
+   CHEMICAL DEFINITIONS
+   ========================================================= */
+
+const chemicalDefinitions = [
+
+    {
+        id: "hydro",
+        name: "Hydrochloric Acid",
+        unit: "Cby",
+        alert: 10,
+        image: "hydrologic-acid.png"
+    },
+
+    {
+        id: "caustic",
+        name: "Caustic Soda",
+        unit: "Cby",
+        alert: 10,
+        image: "caustic.png"
+    },
+
+    {
+        id: "chlorine",
+        name: "Chlorine",
+        unit: "Cby",
+        alert: 10,
+        image: "chlorine.png"
+    },
+
+    {
+        id: "alum",
+        name: "Aluminium Sulphate",
+        unit: "kg",
+        alert: 50,
+        image: "aluminium.png"
+    },
+
+    {
+        id: "polymer",
+        name: "Polymer",
+        unit: "kg",
+        alert: 25,
+        image: "polymer.png"
+    },
+
+    {
+        id: "amphos",
+        name: "Ammonium Phosphate",
+        unit: "kg",
+        alert: 50,
+        image: "ammonium.png"
+    }
+
+];
+
+
+/* =========================================================
+   CHEMICAL OBJECTS USED BY UI
+   ========================================================= */
+
+let chemicals = chemicalDefinitions.map(def => ({
+    ...def,
+    balance: 0,
+    dbId: null
+}));
+
+
+/* =========================================================
+   UTILITY FUNCTIONS
+   ========================================================= */
 
 function getToday() {
 
     const now = new Date();
 
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
+    const year =
+        now.getFullYear();
+
+    const month =
+        String(now.getMonth() + 1).padStart(2, "0");
+
+    const day =
+        String(now.getDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
 }
 
 
-function formatTime(value) {
+function getCurrentShift() {
 
-    if (!value) return "";
+    const hour =
+        new Date().getHours();
 
-    try {
-
-        return new Date(value).toLocaleTimeString(
-            [],
-            {
-                hour: "2-digit",
-                minute: "2-digit"
-            }
-        );
-
-    } catch {
-
-        return value;
-    }
+    return (
+        hour >= 6 &&
+        hour < 18
+    )
+        ? "DS"
+        : "NS";
 }
 
 
-function formatDate(value) {
+function normalizeChemicalName(name) {
 
-    if (!value) return "";
+    return String(name || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
 
-    try {
-
-        return new Date(value).toLocaleDateString(
-            "en-US",
-            {
-                month: "short",
-                day: "numeric",
-                year: "numeric"
-            }
-        );
-
-    } catch {
-
-        return value;
-    }
 }
 
-
-/* ============================================================
-   CHEMICAL FINDER
-   ============================================================ */
 
 function findChemicalByName(name) {
 
-    if (!name) return null;
-
-    const normalized = String(name)
-        .trim()
-        .toLowerCase();
+    const normalized =
+        normalizeChemicalName(name);
 
     return chemicals.find(c =>
-        c.name.toLowerCase() === normalized
-    ) || null;
+        normalizeChemicalName(c.name) === normalized
+    );
+
 }
 
 
-function getChemicalIdFromName(name) {
+function escapeHtml(value) {
 
-    const chem = findChemicalByName(name);
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 
-    return chem ? chem.id : null;
 }
 
 
-/* ============================================================
-   LOAD INVENTORY FROM SUPABASE
-   ============================================================ */
+function formatNumber(value) {
+
+    const n =
+        Number(value || 0);
+
+    return Number.isInteger(n)
+        ? String(n)
+        : n.toFixed(2).replace(/\.?0+$/, "");
+
+}
+
+
+function formatDateTime(value) {
+
+    if (!value) {
+        return "";
+    }
+
+    const date =
+        new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return String(value);
+    }
+
+    return date.toLocaleString(
+        "en-PH",
+        {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        }
+    );
+
+}
+
+
+/* =========================================================
+   TOAST
+   ========================================================= */
+
+function showToast(
+    message,
+    type = "success"
+) {
+
+    const container =
+        document.getElementById("toast-container");
+
+    const toast =
+        document.createElement("div");
+
+    let style =
+        "bg-emerald-700 text-white";
+
+    let icon =
+        "✓";
+
+    if (type === "error") {
+
+        style =
+            "bg-red-600 text-white";
+
+        icon =
+            "!";
+    }
+
+    if (type === "warning") {
+
+        style =
+            "bg-amber-500 text-white";
+
+        icon =
+            "!";
+    }
+
+    toast.className =
+        `toast pointer-events-auto ${style}
+         px-5 py-3 rounded-2xl shadow-xl
+         text-[10px] font-black uppercase
+         tracking-wide flex items-center gap-2`;
+
+    toast.innerHTML =
+        `<span class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">${icon}</span>
+         <span>${escapeHtml(message)}</span>`;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 3700);
+
+}
+
+
+/* =========================================================
+   CONNECTION STATUS
+   ========================================================= */
+
+function setConnectionStatus(
+    connected,
+    message
+) {
+
+    const dot =
+        document.getElementById("connection-dot");
+
+    const text =
+        document.getElementById("connection-text");
+
+    if (connected) {
+
+        dot.className =
+            "w-2 h-2 rounded-full bg-emerald-500";
+
+        text.className =
+            "text-[7px] font-black uppercase text-emerald-500";
+
+        text.innerText =
+            message || "Supabase Connected";
+
+    } else {
+
+        dot.className =
+            "w-2 h-2 rounded-full bg-red-500";
+
+        text.className =
+            "text-[7px] font-black uppercase text-red-500";
+
+        text.innerText =
+            message || "Database Error";
+
+    }
+
+}
+
+
+/* =========================================================
+   LOAD INVENTORY
+   ========================================================= */
 
 async function loadInventory() {
 
-    inventoryLoading = true;
+    if (isLoadingInventory) {
+        return;
+    }
+
+    isLoadingInventory = true;
 
     try {
 
-        const data = await supabaseRequest(
-            "chemical_inventory?select=id,chemical,unit,quantity,updated_at&order=chemical.asc"
-        );
+        const rows =
+            await supabaseRequest(
+                "chemical_inventory",
+                {
+                    method: "GET",
+                    query: "?select=id,chemical,unit,quantity,updated_at&order=chemical.asc"
+                }
+            );
+
+        inventoryRows =
+            Array.isArray(rows)
+                ? rows
+                : [];
 
         chemicals.forEach(chem => {
 
-            const row = data.find(
-                item =>
-                    String(item.chemical).trim().toLowerCase()
-                    === chem.name.trim().toLowerCase()
-            );
+            const row =
+                inventoryRows.find(item =>
+                    normalizeChemicalName(item.chemical) ===
+                    normalizeChemicalName(chem.name)
+                );
 
             if (row) {
 
-                chem.balance = Number(row.quantity || 0);
+                chem.dbId =
+                    row.id;
+
+                chem.balance =
+                    Number(row.quantity || 0);
 
                 if (row.unit) {
-                    chem.unit = row.unit;
+                    chem.unit =
+                        row.unit;
                 }
 
-                chem.inventoryId = row.id;
+            } else {
+
+                chem.dbId =
+                    null;
+
+                chem.balance =
+                    0;
             }
+
         });
+
+        populateChemicalSelect();
+
+        setConnectionStatus(
+            true,
+            "Supabase Connected"
+        );
 
         updateNotifBadge();
 
+        if (!document
+            .getElementById("chem-screen")
+            .classList.contains("hidden")) {
+
+            renderChems();
+        }
+
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "Inventory load failed:",
+            error
+        );
 
-        alert(
-            "Unable to load chemical inventory from Supabase.\n\n" +
-            error.message
+        setConnectionStatus(
+            false,
+            "Database Error"
+        );
+
+        showToast(
+            `Inventory load failed: ${error.message}`,
+            "error"
         );
 
     } finally {
 
-        inventoryLoading = false;
+        isLoadingInventory =
+            false;
     }
+
 }
 
 
-/* ============================================================
-   LOAD LOGS FROM SUPABASE
-   ============================================================ */
+/* =========================================================
+   LOAD LOGS
+   ========================================================= */
 
 async function loadLogs() {
 
+    if (isLoadingLogs) {
+        return;
+    }
+
+    isLoadingLogs = true;
+
     try {
 
-        const data = await supabaseRequest(
-            "chemical_logs?select=id,timestamp,chemical,action,quantity,unit,area,shift,new_main_balance,new_area_balance,operator_name&order=timestamp.desc&limit=5000"
-        );
+        const rows =
+            await supabaseRequest(
+                "chemical_logs",
+                {
+                    method: "GET",
+                    query:
+                        "?select=id,timestamp,chemical,action,quantity,unit,area,shift,new_main_balance,new_area_balance,operator_name,received_by&order=timestamp.desc"
+                }
+            );
 
-        logs = data.map(row => {
-
-            const chem = findChemicalByName(row.chemical);
-
-            return {
-                id: row.id,
-                date: row.timestamp
-                    ? row.timestamp.substring(0, 10)
-                    : "",
-                time: formatTime(row.timestamp),
-                timestamp: row.timestamp,
-                chemId: chem?.id || "",
-                chemName: row.chemical,
-                area: row.area || "",
-                qty: Number(row.quantity || 0),
-                unit: row.unit || chem?.unit || "",
-                operator: row.operator_name || "",
-                receivedBy: row.operator_name || "",
-                type: String(row.action || "").toUpperCase(),
-                newMainBalance: row.new_main_balance,
-                newAreaBalance: row.new_area_balance
-            };
-        });
+        logs =
+            Array.isArray(rows)
+                ? rows
+                : [];
 
         updateNotifBadge();
 
     } catch (error) {
 
-        console.error(error);
-
-        alert(
-            "Unable to load chemical logs from Supabase.\n\n" +
-            error.message
+        console.error(
+            "Logs load failed:",
+            error
         );
+
+        showToast(
+            `Logs load failed: ${error.message}`,
+            "error"
+        );
+
+    } finally {
+
+        isLoadingLogs =
+            false;
     }
+
 }
 
 
-/* ============================================================
-   INITIALIZATION
-   ============================================================ */
+/* =========================================================
+   INITIALIZE
+   ========================================================= */
 
 async function init() {
 
-    document.getElementById("display-date").innerText =
+    document
+        .getElementById("display-date")
+        .innerText =
         new Date().toLocaleDateString(
             "en-US",
             {
@@ -880,40 +1240,76 @@ async function init() {
             }
         );
 
-    document.getElementById("currentYear").textContent =
+    document
+        .getElementById("currentYear")
+        .textContent =
         new Date().getFullYear();
 
-    document.getElementById("admin-chem-select").innerHTML =
-        chemicals.map(c =>
-            `<option value="${c.id}">
-                ${c.name}
-            </option>`
-        ).join("");
+    populateChemicalSelect();
 
-    await loadInventory();
-    await loadLogs();
+    await Promise.all([
+        loadInventory(),
+        loadLogs()
+    ]);
 
     updateNotifBadge();
+
 }
 
 
-/* ============================================================
-   CHEMICAL CARDS
-   ============================================================ */
+/* =========================================================
+   CHEMICAL SELECT
+   ========================================================= */
+
+function populateChemicalSelect() {
+
+    const select =
+        document.getElementById(
+            "admin-chem-select"
+        );
+
+    select.innerHTML =
+        chemicals.map(c => {
+
+            return `
+                <option value="${escapeHtml(c.id)}">
+                    ${escapeHtml(c.name)}
+                </option>
+            `;
+
+        }).join("");
+
+}
+
+
+/* =========================================================
+   RENDER CHEMICALS
+   ========================================================= */
 
 function renderChems() {
 
-    document.getElementById("chem-grid").innerHTML =
+    const container =
+        document.getElementById(
+            "chem-grid"
+        );
+
+    container.innerHTML =
         chemicals.map(c => {
 
-            if (selectedQtys[c.id] === undefined) {
+            if (
+                selectedQtys[c.id] ===
+                undefined
+            ) {
+
                 selectedQtys[c.id] = 0;
             }
 
-            const currentQty = selectedQtys[c.id];
+            const currentQty =
+                selectedQtys[c.id];
 
             const isLowStock =
-                c.balance <= c.alert;
+                Number(c.balance) <=
+                Number(c.alert);
 
             const badgeColor =
                 isLowStock
@@ -930,26 +1326,33 @@ function renderChems() {
                     ? "scale-100 opacity-100"
                     : "scale-75 opacity-0 pointer-events-none";
 
+            const image =
+                c.image
+                    ? `assets/${c.image}`
+                    : "";
+
             return `
+
                 <div
                     class="glass-card relative rounded-[2.5rem] p-4 flex flex-col shadow-xl ${cardAlertStyle} overflow-hidden">
 
                     <div class="flex justify-between items-center w-full mb-2 px-1">
 
-                        <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                        <span
+                            class="text-[8px] font-black text-slate-400 uppercase tracking-widest">
                             Stock
                         </span>
 
-                        <span class="text-[10px] font-black ${
-                            isLowStock
+                        <span
+                            class="text-[10px] font-black ${isLowStock
                                 ? "text-red-600 animate-pulse"
-                                : "text-emerald-700"
-                        }">
+                                : "text-emerald-700"}">
 
-                            ${c.balance}
+                            ${formatNumber(c.balance)}
 
-                            <span class="text-[7px] font-bold text-slate-400 uppercase">
-                                ${c.unit}
+                            <span
+                                class="text-[7px] font-bold text-slate-400 uppercase">
+                                ${escapeHtml(c.unit)}
                             </span>
 
                         </span>
@@ -961,34 +1364,38 @@ function renderChems() {
                         class="relative w-full h-24 flex items-center justify-center mb-2 bg-white/40 rounded-2xl p-2 border border-white/20">
 
                         <div
-                            id="badge-${c.id}"
-                            class="absolute -top-1.5 -right-1.5 ${badgeColor} text-[11px] font-black px-2.5 py-1 rounded-full shadow-md z-30 transition-all duration-300 transform ${badgeVisibility}">
+                            id="badge-${escapeHtml(c.id)}"
+                            class="absolute -top-1.5 -right-1.5 ${badgeColor}
+                            text-[11px] font-black px-2.5 py-1 rounded-full shadow-md z-30
+                            transition-all duration-300 transform ${badgeVisibility}">
 
-                            +${currentQty}
+                            +${formatNumber(currentQty)}
 
                         </div>
 
                         <img
-                            src="assets/${c.image}"
-                            alt="${c.name}"
-                            class="max-w-full max-h-full object-contain drop-shadow-md">
+                            src="${escapeHtml(image)}"
+                            alt="${escapeHtml(c.name)}"
+                            class="max-w-full max-h-full object-contain drop-shadow-md"
+                            onerror="this.style.display='none';">
 
                     </div>
 
 
-                    <div class="w-full text-center px-1 mb-3">
+                    <div
+                        class="w-full text-center px-1 mb-3">
 
                         <h3
-                            class="text-[10px] font-black uppercase text-emerald-950 leading-tight tracking-tighter line-clamp-1">
+                            class="text-[10px] font-black uppercase text-emerald-950 leading-tight tracking-tighter line-clamp-2">
 
-                            ${c.name}
+                            ${escapeHtml(c.name)}
 
                         </h3>
 
                         <span
                             class="text-[7px] font-bold text-slate-400 uppercase tracking-wide">
 
-                            Unit: ${c.unit}
+                            Unit: ${escapeHtml(c.unit)}
 
                         </span>
 
@@ -999,26 +1406,53 @@ function renderChems() {
                         class="grid grid-cols-3 bg-white/80 border border-slate-100 rounded-2xl items-center overflow-hidden mb-3 p-0.5 shadow-inner">
 
                         <button
-                            onclick="adjustQty('${c.id}', -1)"
+                            onclick="adjustQty('${escapeHtml(c.id)}', -1)"
                             class="py-2.5 flex items-center justify-center text-slate-500 hover:bg-slate-50 active:bg-slate-100 text-xs font-black btn-tap rounded-xl transition-colors">
 
-                            −
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 width="14"
+                                 height="14"
+                                 viewBox="0 0 24 24"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 stroke-width="3"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round">
+
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+
+                            </svg>
 
                         </button>
 
+
                         <div
-                            id="display-qty-${c.id}"
+                            id="display-qty-${escapeHtml(c.id)}"
                             class="text-center font-black text-[13px] text-emerald-950 tracking-tight select-none">
 
-                            ${currentQty}
+                            ${formatNumber(currentQty)}
 
                         </div>
 
+
                         <button
-                            onclick="adjustQty('${c.id}', 1)"
+                            onclick="adjustQty('${escapeHtml(c.id)}', 1)"
                             class="py-2.5 flex items-center justify-center text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 text-xs font-black btn-tap rounded-xl transition-colors">
 
-                            +
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 width="14"
+                                 height="14"
+                                 viewBox="0 0 24 24"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 stroke-width="3"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round">
+
+                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+
+                            </svg>
 
                         </button>
 
@@ -1026,7 +1460,7 @@ function renderChems() {
 
 
                     <button
-                        onclick="openTxConfirmation('${c.id}')"
+                        onclick="openTxConfirmation('${escapeHtml(c.id)}')"
                         class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[9px] font-black uppercase tracking-wider shadow-md shadow-emerald-900/10 active:scale-[0.98] transition-all btn-tap">
 
                         Submit Transaction
@@ -1037,59 +1471,82 @@ function renderChems() {
             `;
 
         }).join("");
+
 }
 
 
-/* ============================================================
-   QUANTITY CONTROL
-   ============================================================ */
+/* =========================================================
+   QUANTITY ADJUSTMENT
+   ========================================================= */
 
-function adjustQty(chemId, change) {
+function adjustQty(
+    chemId,
+    change
+) {
 
     const chem =
-        chemicals.find(c => c.id === chemId);
+        chemicals.find(
+            c => c.id === chemId
+        );
 
-    if (!chem) return;
+    if (!chem) {
+        return;
+    }
 
     const targetElement =
-        document.getElementById(`display-qty-${chemId}`);
+        document.getElementById(
+            `display-qty-${chemId}`
+        );
 
     const badgeElement =
-        document.getElementById(`badge-${chemId}`);
+        document.getElementById(
+            `badge-${chemId}`
+        );
 
     let newQty =
-        (selectedQtys[chemId] || 0) + change;
+        (selectedQtys[chemId] || 0) +
+        change;
 
     if (newQty < 0) {
         return;
     }
 
-    if (newQty > chem.balance) {
+    if (
+        newQty >
+        Number(chem.balance)
+    ) {
 
-        alert(
-            `Cannot exceed available stock balance (${chem.balance} ${chem.unit})`
+        showToast(
+            `Cannot exceed available stock balance (${formatNumber(chem.balance)} ${chem.unit})`,
+            "warning"
         );
 
         return;
     }
 
-    selectedQtys[chemId] = newQty;
+    selectedQtys[chemId] =
+        newQty;
 
     if (targetElement) {
 
-        targetElement.innerText = newQty;
+        targetElement.innerText =
+            formatNumber(newQty);
 
-        targetElement.classList.remove("qty-bounce");
+        targetElement.classList.remove(
+            "qty-bounce"
+        );
 
         void targetElement.offsetWidth;
 
-        targetElement.classList.add("qty-bounce");
+        targetElement.classList.add(
+            "qty-bounce"
+        );
     }
 
     if (badgeElement) {
 
         badgeElement.innerText =
-            `+${newQty}`;
+            `+${formatNumber(newQty)}`;
 
         if (newQty > 0) {
 
@@ -1116,53 +1573,83 @@ function adjustQty(chemId, change) {
                 "opacity-0",
                 "pointer-events-none"
             );
+
         }
+
     }
+
 }
 
 
-/* ============================================================
+/* =========================================================
    TRANSACTION MODAL
-   ============================================================ */
+   ========================================================= */
 
-function openTxConfirmation(chemId) {
+function openTxConfirmation(
+    chemId
+) {
 
     const qty =
-        selectedQtys[chemId] || 0;
+        Number(
+            selectedQtys[chemId] || 0
+        );
 
     if (qty <= 0) {
 
-        alert(
-            "Please select a quantity greater than 0."
+        showToast(
+            "Please select a quantity greater than 0.",
+            "warning"
         );
 
         return;
     }
 
     const chem =
-        chemicals.find(c => c.id === chemId);
+        chemicals.find(
+            c => c.id === chemId
+        );
 
-    if (!chem) return;
+    if (!chem) {
+        return;
+    }
 
-    activeTxChemId = chemId;
+    if (!chem.dbId) {
 
-    document.getElementById("tx-modal-msg").innerHTML =
-        `Confirm deduction of
-        <span class="text-emerald-600 font-black text-sm underline">
-            ${qty}
-        </span>
-        ${chem.unit}
-        from
-        <span class="font-bold text-slate-800">
-            ${chem.name.toUpperCase()}
-        </span>
-        inventory?`;
+        showToast(
+            `${chem.name} is not found in chemical_inventory.`,
+            "error"
+        );
 
-    document.getElementById("tx-operator").value = "";
+        return;
+    }
+
+    activeTxChemId =
+        chemId;
+
+    document
+        .getElementById("tx-modal-msg")
+        .innerHTML =
+        `
+            Confirm deduction of
+            <span class="text-emerald-600 font-black text-sm underline">
+                ${formatNumber(qty)}
+            </span>
+            ${escapeHtml(chem.unit)}
+            from
+            <span class="font-bold text-slate-800">
+                ${escapeHtml(chem.name.toUpperCase())}
+            </span>
+            inventory?
+        `;
+
+    document
+        .getElementById("tx-operator")
+        .value = "";
 
     document
         .getElementById("tx-confirm-modal")
         .classList.remove("hidden");
+
 }
 
 
@@ -1172,31 +1659,15 @@ function closeTxModal() {
         .getElementById("tx-confirm-modal")
         .classList.add("hidden");
 
-    activeTxChemId = null;
+    activeTxChemId =
+        null;
+
 }
 
 
-/* ============================================================
-   SHIFT
-   ============================================================ */
-
-function getCurrentShift() {
-
-    const hour =
-        new Date().getHours();
-
-    return (
-        hour >= 6 &&
-        hour < 18
-    )
-        ? "DS"
-        : "NS";
-}
-
-
-/* ============================================================
-   CHEMICAL USAGE / OUT
-   ============================================================ */
+/* =========================================================
+   EXECUTE USAGE TRANSACTION
+   ========================================================= */
 
 async function executeSupabaseTx() {
 
@@ -1209,8 +1680,19 @@ async function executeSupabaseTx() {
 
     if (!operatorName) {
 
-        alert(
-            "Operator name is required."
+        showToast(
+            "Operator name is required.",
+            "warning"
+        );
+
+        return;
+    }
+
+    if (!currentArea) {
+
+        showToast(
+            "Please select a plant area first.",
+            "warning"
         );
 
         return;
@@ -1219,79 +1701,117 @@ async function executeSupabaseTx() {
     const chemId =
         activeTxChemId;
 
-    if (!chemId) return;
-
     const deductionQty =
-        Number(selectedQtys[chemId] || 0);
-
-    const chem =
-        chemicals.find(c => c.id === chemId);
-
-    if (!chem || deductionQty <= 0) {
-        return;
-    }
-
-    if (chem.balance < deductionQty) {
-
-        alert(
-            "Insufficient chemical inventory."
+        Number(
+            selectedQtys[chemId] || 0
         );
 
-        closeTxModal();
+    const chem =
+        chemicals.find(
+            c => c.id === chemId
+        );
+
+    if (!chem || !chem.dbId) {
+
+        showToast(
+            "Chemical inventory record not found.",
+            "error"
+        );
 
         return;
     }
 
-    const newBalance =
-        Number(chem.balance) -
-        deductionQty;
+    if (deductionQty <= 0) {
 
-    const now =
-        new Date().toISOString();
+        showToast(
+            "Invalid quantity.",
+            "warning"
+        );
+
+        return;
+    }
+
+    const button =
+        document.getElementById(
+            "tx-confirm-btn"
+        );
+
+    button.disabled =
+        true;
+
+    button.innerText =
+        "Saving...";
 
     try {
 
         /*
-         * STEP 1
-         * UPDATE MAIN INVENTORY
+         * IMPORTANT:
+         * Re-read current stock from Supabase
+         * before deducting.
          */
 
-        if (!chem.inventoryId) {
+        const freshRows =
+            await supabaseRequest(
+                "chemical_inventory",
+                {
+                    method: "GET",
+                    query:
+                        `?select=id,chemical,unit,quantity,updated_at&id=eq.${encodeURIComponent(chem.dbId)}`
+                }
+            );
 
-            const inventoryRows =
-                await supabaseRequest(
-                    `chemical_inventory?chemical=eq.${encodeURIComponent(chem.name)}&select=id,quantity`
-                );
+        const fresh =
+            freshRows?.[0];
 
-            if (!inventoryRows.length) {
-
-                throw new Error(
-                    `Inventory record not found for ${chem.name}.`
-                );
-            }
-
-            chem.inventoryId =
-                inventoryRows[0].id;
+        if (!fresh) {
+            throw new Error(
+                "Inventory record no longer exists."
+            );
         }
 
+        const currentBalance =
+            Number(fresh.quantity || 0);
+
+        if (
+            deductionQty >
+            currentBalance
+        ) {
+
+            throw new Error(
+                `Insufficient stock. Current balance is ${formatNumber(currentBalance)} ${fresh.unit}.`
+            );
+        }
+
+        const newBalance =
+            currentBalance -
+            deductionQty;
+
+
+        /* UPDATE INVENTORY */
 
         await supabaseRequest(
-            `chemical_inventory?id=eq.${chem.inventoryId}`,
+            "chemical_inventory",
             {
                 method: "PATCH",
 
+                query:
+                    `?id=eq.${encodeURIComponent(chem.dbId)}`,
+
                 body: {
-                    quantity: newBalance,
-                    updated_at: now
-                }
+                    quantity:
+                        newBalance,
+
+                    updated_at:
+                        new Date().toISOString()
+                },
+
+                prefer:
+                    "return=representation"
             }
         );
 
 
-        /*
-         * STEP 2
-         * CREATE USAGE LOG
-         */
+        /* INSERT USAGE LOG */
 
         await supabaseRequest(
             "chemical_logs",
@@ -1299,25 +1819,48 @@ async function executeSupabaseTx() {
                 method: "POST",
 
                 body: {
-                    timestamp: now,
-                    chemical: chem.name,
-                    action: "OUT",
-                    quantity: deductionQty,
-                    unit: chem.unit,
-                    area: currentArea,
-                    shift: getCurrentShift(),
-                    new_main_balance: newBalance,
-                    new_area_balance: null,
-                    operator_name: operatorName
-                }
+
+                    timestamp:
+                        new Date().toISOString(),
+
+                    chemical:
+                        fresh.chemical,
+
+                    action:
+                        "OUT",
+
+                    quantity:
+                        deductionQty,
+
+                    unit:
+                        fresh.unit,
+
+                    area:
+                        currentArea,
+
+                    shift:
+                        getCurrentShift(),
+
+                    new_main_balance:
+                        newBalance,
+
+                    new_area_balance:
+                        newBalance,
+
+                    operator_name:
+                        operatorName,
+
+                    received_by:
+                        null
+                },
+
+                prefer:
+                    "return=representation"
             }
         );
 
 
-        /*
-         * STEP 3
-         * UPDATE LOCAL MEMORY ONLY FOR UI
-         */
+        /* REFRESH LOCAL STATE */
 
         chem.balance =
             newBalance;
@@ -1333,28 +1876,38 @@ async function executeSupabaseTx() {
 
         closeTxModal();
 
-        alert(
-            "Chemical usage successfully recorded."
+        showToast(
+            `${chem.name}: ${formatNumber(deductionQty)} ${chem.unit} deducted successfully.`
         );
 
     } catch (error) {
 
         console.error(
-            "TRANSACTION ERROR:",
+            "Usage transaction failed:",
             error
         );
 
-        alert(
-            "Transaction failed.\n\n" +
-            error.message
+        showToast(
+            error.message ||
+            "Transaction failed.",
+            "error"
         );
+
+    } finally {
+
+        button.disabled =
+            false;
+
+        button.innerText =
+            "Confirm";
     }
+
 }
 
 
-/* ============================================================
-   DELIVERY / STOCK IN
-   ============================================================ */
+/* =========================================================
+   ADMIN ADD STOCK / DELIVERY
+   ========================================================= */
 
 async function adminAddStock() {
 
@@ -1364,7 +1917,7 @@ async function adminAddStock() {
             .value;
 
     const qtyInput =
-        parseFloat(
+        Number(
             document
                 .getElementById("admin-qty")
                 .value
@@ -1377,10 +1930,14 @@ async function adminAddStock() {
             .trim()
             .toUpperCase();
 
-    if (!qtyInput || qtyInput <= 0) {
+    if (
+        !qtyInput ||
+        qtyInput <= 0
+    ) {
 
-        alert(
-            "Enter a valid quantity."
+        showToast(
+            "Please enter a valid quantity.",
+            "warning"
         );
 
         return;
@@ -1388,83 +1945,112 @@ async function adminAddStock() {
 
     if (!receiver) {
 
-        alert(
-            "Received By is required."
+        showToast(
+            "Received By is required.",
+            "warning"
         );
 
         return;
     }
 
     const chem =
-        chemicals.find(c => c.id === id);
+        chemicals.find(
+            c => c.id === id
+        );
 
-    if (!chem) return;
+    if (!chem || !chem.dbId) {
 
+        showToast(
+            "Chemical inventory record not found.",
+            "error"
+        );
 
-    /*
-     * ALUMINIUM:
-     * Existing system treats one sack as 25 kg.
-     */
+        return;
+    }
 
-    const finalAdd =
-        id === "alum"
-            ? qtyInput * 25
-            : qtyInput;
+    const submitButton =
+        document.querySelector(
+            "#delivery-form button[onclick='adminAddStock()']"
+        );
 
+    if (submitButton) {
 
-    const newBalance =
-        Number(chem.balance) +
-        finalAdd;
+        submitButton.disabled =
+            true;
 
-    const now =
-        new Date().toISOString();
-
+        submitButton.innerText =
+            "Saving...";
+    }
 
     try {
 
         /*
-         * GET INVENTORY ID IF NEEDED
+         * Existing business rule:
+         * Aluminium Sulphate is entered by sack.
+         * 1 sack = 25 kg.
          */
 
-        if (!chem.inventoryId) {
+        const actualQuantity =
+            id === "alum"
+                ? qtyInput * 25
+                : qtyInput;
 
-            const rows =
-                await supabaseRequest(
-                    `chemical_inventory?chemical=eq.${encodeURIComponent(chem.name)}&select=id,quantity`
-                );
 
-            if (!rows.length) {
+        /* REFRESH INVENTORY */
 
-                throw new Error(
-                    `Inventory record not found for ${chem.name}.`
-                );
-            }
+        const freshRows =
+            await supabaseRequest(
+                "chemical_inventory",
+                {
+                    method: "GET",
+                    query:
+                        `?select=id,chemical,unit,quantity,updated_at&id=eq.${encodeURIComponent(chem.dbId)}`
+                }
+            );
 
-            chem.inventoryId =
-                rows[0].id;
+        const fresh =
+            freshRows?.[0];
+
+        if (!fresh) {
+            throw new Error(
+                "Inventory record no longer exists."
+            );
         }
 
+        const currentBalance =
+            Number(fresh.quantity || 0);
 
-        /*
-         * UPDATE INVENTORY
-         */
+        const newBalance =
+            currentBalance +
+            actualQuantity;
+
+
+        /* UPDATE INVENTORY */
 
         await supabaseRequest(
-            `chemical_inventory?id=eq.${chem.inventoryId}`,
+            "chemical_inventory",
             {
                 method: "PATCH",
 
+                query:
+                    `?id=eq.${encodeURIComponent(chem.dbId)}`,
+
                 body: {
-                    quantity: newBalance,
-                    updated_at: now
-                }
+
+                    quantity:
+                        newBalance,
+
+                    updated_at:
+                        new Date().toISOString()
+                },
+
+                prefer:
+                    "return=representation"
             }
         );
 
 
-        /*
-         * CREATE DELIVERY LOG
-         */
+        /* INSERT DELIVERY LOG */
 
         await supabaseRequest(
             "chemical_logs",
@@ -1472,27 +2058,46 @@ async function adminAddStock() {
                 method: "POST",
 
                 body: {
-                    timestamp: now,
-                    chemical: chem.name,
-                    action: "IN",
-                    quantity: qtyInput,
+
+                    timestamp:
+                        new Date().toISOString(),
+
+                    chemical:
+                        fresh.chemical,
+
+                    action:
+                        "IN",
+
+                    quantity:
+                        actualQuantity,
+
                     unit:
-                        id === "alum"
-                            ? "Sacks"
-                            : chem.unit,
-                    area: "WAREHOUSE",
-                    shift: getCurrentShift(),
-                    new_main_balance: newBalance,
-                    new_area_balance: null,
-                    operator_name: receiver
-                }
+                        fresh.unit,
+
+                    area:
+                        null,
+
+                    shift:
+                        getCurrentShift(),
+
+                    new_main_balance:
+                        newBalance,
+
+                    new_area_balance:
+                        newBalance,
+
+                    operator_name:
+                        null,
+
+                    received_by:
+                        receiver
+                },
+
+                prefer:
+                    "return=representation"
             }
         );
 
-
-        /*
-         * UPDATE UI
-         */
 
         chem.balance =
             newBalance;
@@ -1503,9 +2108,13 @@ async function adminAddStock() {
 
         updateNotifBadge();
 
-        document.getElementById("admin-qty").value = "";
+        document
+            .getElementById("admin-qty")
+            .value = "";
 
-        document.getElementById("admin-receiver").value = "";
+        document
+            .getElementById("admin-receiver")
+            .value = "";
 
         document
             .getElementById("delivery-form")
@@ -1515,34 +2124,49 @@ async function adminAddStock() {
             applyFilters();
         }
 
-        alert(
-            `Successfully added ${qtyInput} ${
-                id === "alum"
-                    ? "sacks"
-                    : chem.unit
-            }`
+        showToast(
+            `Successfully added ${formatNumber(actualQuantity)} ${fresh.unit} to ${fresh.chemical}.`
         );
 
     } catch (error) {
 
-        console.error(error);
-
-        alert(
-            "Delivery failed.\n\n" +
-            error.message
+        console.error(
+            "Delivery failed:",
+            error
         );
+
+        showToast(
+            error.message ||
+            "Delivery transaction failed.",
+            "error"
+        );
+
+    } finally {
+
+        if (submitButton) {
+
+            submitButton.disabled =
+                false;
+
+            submitButton.innerText =
+                "Submit Delivery";
+        }
+
     }
+
 }
 
 
-/* ============================================================
+/* =========================================================
    FILTER BAR
-   ============================================================ */
+   ========================================================= */
 
 function renderFilterBar() {
 
     const bar =
-        document.getElementById("filter-bar");
+        document.getElementById(
+            "filter-bar"
+        );
 
     if (activeTab === "STATS") {
 
@@ -1568,6 +2192,7 @@ function renderFilterBar() {
 
             </div>
 
+
             <div class="grid grid-cols-2 gap-2">
 
                 <select
@@ -1579,11 +2204,11 @@ function renderFilterBar() {
                         ALL CHEMICALS
                     </option>
 
-                    ${chemicals.map(c =>
-                        `<option value="${c.id}">
-                            ${c.name.toUpperCase()}
-                        </option>`
-                    ).join("")}
+                    ${chemicals.map(c => `
+                        <option value="${escapeHtml(c.name)}">
+                            ${escapeHtml(c.name.toUpperCase())}
+                        </option>
+                    `).join("")}
 
                 </select>
 
@@ -1617,25 +2242,6 @@ function renderFilterBar() {
 
             </div>
 
-            <div class="grid grid-cols-2 gap-2 mt-2">
-
-                <button
-                    onclick="printFilteredReport()"
-                    class="bg-slate-800 text-white p-2 rounded-xl text-[9px] font-black uppercase">
-
-                    🖨 Print
-
-                </button>
-
-                <button
-                    onclick="exportCSV()"
-                    class="bg-emerald-600 text-white p-2 rounded-xl text-[9px] font-black uppercase">
-
-                    📊 Excel
-
-                </button>
-
-            </div>
         `;
 
     } else {
@@ -1654,81 +2260,51 @@ function renderFilterBar() {
                     type="text"
                     id="f-rcv"
                     oninput="applyFilters()"
-                    placeholder="SEARCH OPERATOR..."
+                    placeholder="SEARCH RECEIVER..."
                     class="flex-1 p-2 rounded-xl text-[9px] font-black border border-emerald-200 bg-white uppercase italic">
 
             </div>
 
-            <div class="grid grid-cols-2 gap-2 mt-2">
-
-                <button
-                    onclick="printFilteredReport()"
-                    class="bg-slate-800 text-white p-2 rounded-xl text-[9px] font-black uppercase">
-
-                    🖨 Print
-
-                </button>
-
-                <button
-                    onclick="exportCSV()"
-                    class="bg-emerald-600 text-white p-2 rounded-xl text-[9px] font-black uppercase">
-
-                    📊 Excel
-
-                </button>
-
-            </div>
         `;
+
     }
+
 }
 
 
-/* ============================================================
-   APPLY FILTERS
-   ============================================================ */
+/* =========================================================
+   GET FILTERED LOGS
+   ========================================================= */
 
-function applyFilters() {
+function getFilteredLogs() {
 
-    const container =
-        document.getElementById(
-            "admin-content-area"
+    let data =
+        logs.filter(
+            l => l.action === activeTab
         );
 
     const dateElement =
         document.getElementById("f-date");
 
-    const dt =
+    const selectedDate =
         dateElement
             ? dateElement.value
             : "";
 
-    const currentMonth =
-        getToday().slice(0, 7);
+    if (selectedDate) {
 
-    let d =
-        logs.filter(
-            l =>
-                l.type === activeTab
-        );
+        data =
+            data.filter(l => {
 
+                if (!l.timestamp) {
+                    return false;
+                }
 
-    if (dt) {
+                return l.timestamp
+                    .slice(0, 10) ===
+                    selectedDate;
+            });
 
-        d =
-            d.filter(
-                l =>
-                    l.date === dt
-            );
-
-    } else {
-
-        d =
-            d.filter(
-                l =>
-                    l.date.startsWith(
-                        currentMonth
-                    )
-            );
     }
 
 
@@ -1740,143 +2316,126 @@ function applyFilters() {
         const areaElement =
             document.getElementById("f-area");
 
-        const ch =
+        const chem =
             chemElement
                 ? chemElement.value
                 : "ALL";
 
-        const ar =
+        const area =
             areaElement
                 ? areaElement.value
                 : "ALL";
 
+        if (chem !== "ALL") {
 
-        if (ch !== "ALL") {
-
-            d =
-                d.filter(
+            data =
+                data.filter(
                     l =>
-                        l.chemId === ch
+                        normalizeChemicalName(
+                            l.chemical
+                        ) ===
+                        normalizeChemicalName(
+                            chem
+                        )
                 );
         }
 
+        if (area !== "ALL") {
 
-        if (ar !== "ALL") {
-
-            d =
-                d.filter(
+            data =
+                data.filter(
                     l =>
-                        l.area === ar
+                        l.area === area
                 );
         }
 
+    } else {
+
+        const receiverElement =
+            document.getElementById("f-rcv");
+
+        const receiver =
+            receiverElement
+                ? receiverElement.value
+                    .trim()
+                    .toUpperCase()
+                : "";
+
+        if (receiver) {
+
+            data =
+                data.filter(l =>
+                    String(
+                        l.received_by || ""
+                    )
+                        .toUpperCase()
+                        .includes(receiver)
+                );
+        }
+
+    }
+
+    return data;
+}
+
+
+/* =========================================================
+   APPLY FILTERS / RENDER LOGS
+   ========================================================= */
+
+function applyFilters() {
+
+    const container =
+        document.getElementById(
+            "admin-content-area"
+        );
+
+    const data =
+        getFilteredLogs();
+
+    const dateElement =
+        document.getElementById("f-date");
+
+    const selectedDate =
+        dateElement
+            ? dateElement.value
+            : "";
+
+    const periodLabel =
+        selectedDate
+            ? `Date: ${selectedDate}`
+            : "All Records";
+
+    if (activeTab === "OUT") {
 
         container.innerHTML = `
 
-            <div class="flex justify-between items-center mb-2 px-4">
-
-                <p class="text-[8px] font-black uppercase text-emerald-600/50">
-
-                    ${
-                        dt
-                            ? "Date: " + dt
-                            : "Monthly View: " + currentMonth
-                    }
-
-                </p>
-
-                <span class="text-[8px] font-black text-emerald-700">
-                    ${d.length} RECORDS
-                </span>
-
-            </div>
-
+            <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">
+                ${escapeHtml(periodLabel)}
+            </p>
 
             <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
 
-                <div class="grid grid-cols-5 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400">
+                <div class="grid grid-cols-5 bg-emerald-50/50 p-4 text-[7px] font-black uppercase text-emerald-400 gap-2">
 
-                    <span>Chem</span>
+                    <span>Chemical</span>
                     <span>Area</span>
                     <span>Operator</span>
                     <span class="text-right">Qty</span>
-                    <span class="text-right">Action</span>
+                    <span class="text-right">Time</span>
 
                 </div>
 
 
                 ${
-                    d.length
+                    data.length
 
-                        ? d.map(l => `
-
-                            <div
-                                class="grid grid-cols-5 gap-1 p-4 border-b border-emerald-50 text-[8px] font-bold uppercase last:border-0 items-center">
-
-                                <span class="leading-tight">
-
-                                    ${l.chemName}
-
-                                    <br>
-
-                                    <span class="text-[7px] text-emerald-300 font-normal">
-
-                                        ${l.time}
-
-                                    </span>
-
-                                </span>
-
-
-                                <span class="text-emerald-500 italic">
-
-                                    ${l.area || "-"}
-
-                                </span>
-
-
-                                <span class="text-slate-500 leading-tight">
-
-                                    ${l.operator || "-"}
-
-                                </span>
-
-
-                                <span class="text-right font-black text-emerald-900">
-
-                                    -${l.qty}
-
-                                    <span class="text-[6px]">
-                                        ${l.unit}
-                                    </span>
-
-                                </span>
-
-
-                                <div class="text-right">
-
-                                    <button
-                                        onclick="deleteUsage('${l.id}')"
-                                        class="bg-red-50 text-red-500 px-2 py-1.5 rounded-xl text-[7px] font-black uppercase">
-
-                                        Undo
-
-                                    </button>
-
-                                </div>
-
-                            </div>
-
-                        `).join("")
+                        ? data.map(renderUsageRow).join("")
 
                         : `
-
                             <div class="p-10 text-center text-emerald-200 text-[10px] font-black italic">
-
-                                No Records
-
+                                No Usage Records
                             </div>
-
                         `
                 }
 
@@ -1885,349 +2444,373 @@ function applyFilters() {
 
     } else {
 
-        const receiverElement =
-            document.getElementById("f-rcv");
-
-        const rcv =
-            receiverElement
-                ? receiverElement.value
-                    .trim()
-                    .toUpperCase()
-                : "";
-
-
-        if (rcv) {
-
-            d =
-                d.filter(
-                    l =>
-                        (l.operator || "")
-                            .toUpperCase()
-                            .includes(rcv)
-                );
-        }
-
-
         container.innerHTML = `
 
-            <div class="flex justify-between items-center mb-2 px-4">
-
-                <p class="text-[8px] font-black uppercase text-emerald-600/50">
-
-                    ${
-                        dt
-                            ? "Date: " + dt
-                            : "Monthly View: " + currentMonth
-                    }
-
-                </p>
-
-                <span class="text-[8px] font-black text-emerald-700">
-
-                    ${d.length} RECORDS
-
-                </span>
-
-            </div>
-
+            <p class="text-[8px] font-black uppercase text-emerald-600/50 mb-2 px-4">
+                ${escapeHtml(periodLabel)}
+            </p>
 
             <div class="bg-white rounded-[2.5rem] border border-emerald-100 overflow-hidden shadow-sm">
 
-                <div class="grid grid-cols-5 bg-emerald-50/50 p-4 text-[8px] font-black uppercase text-emerald-400">
+                <div class="grid grid-cols-5 bg-emerald-50/50 p-4 text-[7px] font-black uppercase text-emerald-400 gap-2">
 
-                    <span>Chem</span>
+                    <span>Chemical</span>
                     <span>Qty</span>
-                    <span>Operator</span>
+                    <span>Received By</span>
                     <span>Balance</span>
-                    <span class="text-right">Action</span>
+                    <span class="text-right">Time</span>
 
                 </div>
 
 
                 ${
-                    d.length
+                    data.length
 
-                        ? d.map(l => `
-
-                            <div
-                                class="grid grid-cols-5 gap-1 p-4 border-b border-emerald-50 text-[8px] font-bold uppercase last:border-0 items-center">
-
-                                <span class="leading-tight">
-
-                                    ${l.chemName}
-
-                                    <br>
-
-                                    <span class="text-[7px] text-emerald-400 font-normal">
-
-                                        ${l.time}
-
-                                    </span>
-
-                                </span>
-
-
-                                <span class="text-emerald-700">
-
-                                    +${l.qty}
-                                    ${l.unit}
-
-                                </span>
-
-
-                                <span class="text-slate-500">
-
-                                    ${l.operator || "-"}
-
-                                </span>
-
-
-                                <span class="font-black text-emerald-900">
-
-                                    ${l.newMainBalance ?? "-"}
-
-                                </span>
-
-
-                                <div class="text-right">
-
-                                    <button
-                                        onclick="deleteDelivery('${l.id}')"
-                                        class="bg-red-50 text-red-500 px-2 py-1.5 rounded-xl text-[7px] font-black uppercase">
-
-                                        Del
-
-                                    </button>
-
-                                </div>
-
-                            </div>
-
-                        `).join("")
+                        ? data.map(renderDeliveryRow).join("")
 
                         : `
-
                             <div class="p-10 text-center text-emerald-200 text-[10px] font-black">
-
-                                No Deliveries
-
+                                No Delivery Records
                             </div>
-
                         `
                 }
 
             </div>
         `;
+
     }
+
 }
 
 
-/* ============================================================
-   DELETE USAGE / RESTORE STOCK
-   ============================================================ */
+/* =========================================================
+   USAGE ROW
+   ========================================================= */
 
-async function deleteUsage(logId) {
+function renderUsageRow(log) {
 
-    if (!confirm(
-        "CORRECTION:\n\n" +
-        "Delete this usage and RETURN stock to inventory?"
-    )) {
+    const quantity =
+        Number(log.quantity || 0);
+
+    const balance =
+        Number(
+            log.new_main_balance || 0
+        );
+
+    return `
+
+        <div
+            class="grid grid-cols-5 p-4 border-b border-emerald-50 text-[8px] font-bold uppercase last:border-0 items-center gap-2">
+
+            <span class="leading-tight">
+
+                ${escapeHtml(log.chemical)}
+
+                <br>
+
+                <span class="text-[6px] text-emerald-300 font-normal">
+
+                    ${escapeHtml(
+                        formatDateTime(
+                            log.timestamp
+                        )
+                    )}
+
+                </span>
+
+            </span>
+
+
+            <span class="text-emerald-500 italic">
+
+                ${escapeHtml(log.area || "-")}
+
+            </span>
+
+
+            <span class="text-slate-500 leading-tight">
+
+                ${escapeHtml(
+                    log.operator_name || "-"
+                )}
+
+            </span>
+
+
+            <span class="text-right font-black text-red-600">
+
+                -${formatNumber(quantity)}
+
+                <span class="text-[6px] text-slate-400">
+
+                    ${escapeHtml(log.unit || "")}
+
+                </span>
+
+            </span>
+
+
+            <span class="text-right">
+
+                <span class="text-emerald-700 font-black">
+
+                    ${formatNumber(balance)}
+
+                </span>
+
+                <button
+                    onclick="correctUsage('${escapeHtml(log.id)}')"
+                    class="block ml-auto mt-1 bg-red-50 text-red-500 px-2 py-1 rounded-lg text-[6px] font-black uppercase">
+
+                    Correct
+
+                </button>
+
+            </span>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   DELIVERY ROW
+   ========================================================= */
+
+function renderDeliveryRow(log) {
+
+    const quantity =
+        Number(log.quantity || 0);
+
+    const balance =
+        Number(
+            log.new_main_balance || 0
+        );
+
+    return `
+
+        <div
+            class="grid grid-cols-5 p-4 border-b border-emerald-50 text-[8px] font-bold uppercase last:border-0 items-center gap-2">
+
+            <span class="leading-tight">
+
+                ${escapeHtml(log.chemical)}
+
+                <br>
+
+                <span class="text-[6px] text-emerald-300 font-normal">
+
+                    ${escapeHtml(
+                        formatDateTime(
+                            log.timestamp
+                        )
+                    )}
+
+                </span>
+
+            </span>
+
+
+            <span class="text-emerald-700 font-black">
+
+                +${formatNumber(quantity)}
+
+                <span class="text-[6px] text-slate-400">
+
+                    ${escapeHtml(log.unit || "")}
+
+                </span>
+
+            </span>
+
+
+            <span class="text-slate-500 leading-tight">
+
+                ${escapeHtml(
+                    log.received_by || "-"
+                )}
+
+            </span>
+
+
+            <span class="font-black text-emerald-900">
+
+                ${formatNumber(balance)}
+
+            </span>
+
+
+            <span class="text-right">
+
+                <button
+                    onclick="correctDelivery('${escapeHtml(log.id)}')"
+                    class="bg-red-50 text-red-500 px-2 py-1 rounded-lg text-[6px] font-black uppercase">
+
+                    Correct
+
+                </button>
+
+            </span>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================================
+   CORRECT USAGE
+   ========================================================= */
+
+async function correctUsage(
+    logId
+) {
+
+    const confirmed =
+        confirm(
+            "CORRECTION:\n\nThis will RETURN the used quantity to inventory and create a correction record.\n\nContinue?"
+        );
+
+    if (!confirmed) {
         return;
     }
 
-
-    const logEntry =
+    const log =
         logs.find(
-            l =>
-                String(l.id) ===
-                String(logId)
+            l => String(l.id) ===
+            String(logId)
         );
 
-    if (!logEntry) return;
+    if (!log) {
 
+        showToast(
+            "Usage record not found.",
+            "error"
+        );
+
+        return;
+    }
 
     const chem =
-        chemicals.find(
-            c =>
-                c.id === logEntry.chemId
+        findChemicalByName(
+            log.chemical
         );
 
-    if (!chem) {
+    if (!chem || !chem.dbId) {
 
-        alert(
-            "Chemical not found."
+        showToast(
+            "Chemical inventory record not found.",
+            "error"
         );
 
         return;
     }
-
 
     try {
 
-        const newBalance =
-            Number(chem.balance) +
-            Number(logEntry.qty);
-
-
-        /*
-         * RESTORE INVENTORY
-         */
-
-        await supabaseRequest(
-            `chemical_inventory?id=eq.${chem.inventoryId}`,
-            {
-                method: "PATCH",
-
-                body: {
-                    quantity: newBalance,
-                    updated_at:
-                        new Date().toISOString()
+        const freshRows =
+            await supabaseRequest(
+                "chemical_inventory",
+                {
+                    method: "GET",
+                    query:
+                        `?select=id,chemical,unit,quantity&id=eq.${encodeURIComponent(chem.dbId)}`
                 }
-            }
-        );
+            );
 
+        const fresh =
+            freshRows?.[0];
 
-        /*
-         * DELETE LOG
-         */
-
-        await supabaseRequest(
-            `chemical_logs?id=eq.${logId}`,
-            {
-                method: "DELETE"
-            }
-        );
-
-
-        chem.balance =
-            newBalance;
-
-
-        await loadLogs();
-
-        applyFilters();
-
-        renderChems();
-
-        updateNotifBadge();
-
-
-        alert(
-            "Usage undone. Stock restored!"
-        );
-
-    } catch (error) {
-
-        console.error(error);
-
-        alert(
-            "Unable to undo usage.\n\n" +
-            error.message
-        );
-    }
-}
-
-
-/* ============================================================
-   DELETE DELIVERY
-   ============================================================ */
-
-async function deleteDelivery(logId) {
-
-    if (!confirm(
-        "CORRECTION:\n\n" +
-        "Remove this delivery and deduct the stock?"
-    )) {
-        return;
-    }
-
-
-    const logEntry =
-        logs.find(
-            l =>
-                String(l.id) ===
-                String(logId)
-        );
-
-    if (!logEntry) return;
-
-
-    const chem =
-        chemicals.find(
-            c =>
-                c.id === logEntry.chemId
-        );
-
-    if (!chem) {
-
-        alert(
-            "Chemical not found."
-        );
-
-        return;
-    }
-
-
-    /*
-     * For Aluminium:
-     * quantity is stored as sacks.
-     * One sack = 25 kg.
-     */
-
-    const amountToDeduct =
-        chem.id === "alum"
-            ? Number(logEntry.qty) * 25
-            : Number(logEntry.qty);
-
-
-    if (
-        Number(chem.balance) <
-        amountToDeduct
-    ) {
-
-        if (!confirm(
-            "Warning:\n\n" +
-            "Current stock is lower than the delivery amount.\n" +
-            "Proceed and allow the balance to go negative?"
-        )) {
-            return;
+        if (!fresh) {
+            throw new Error(
+                "Inventory record not found."
+            );
         }
-    }
 
+        const currentBalance =
+            Number(fresh.quantity || 0);
 
-    try {
+        const restoreQty =
+            Number(log.quantity || 0);
 
         const newBalance =
-            Number(chem.balance) -
-            amountToDeduct;
+            currentBalance +
+            restoreQty;
 
 
-        /*
-         * UPDATE INVENTORY
-         */
+        /* RESTORE INVENTORY */
 
         await supabaseRequest(
-            `chemical_inventory?id=eq.${chem.inventoryId}`,
+            "chemical_inventory",
             {
                 method: "PATCH",
 
+                query:
+                    `?id=eq.${encodeURIComponent(chem.dbId)}`,
+
                 body: {
-                    quantity: newBalance,
+
+                    quantity:
+                        newBalance,
+
                     updated_at:
                         new Date().toISOString()
-                }
+                },
+
+                prefer:
+                    "return=representation"
             }
         );
 
 
-        /*
-         * DELETE DELIVERY LOG
-         */
+        /* CREATE CORRECTION LOG */
 
         await supabaseRequest(
-            `chemical_logs?id=eq.${logId}`,
+            "chemical_logs",
             {
-                method: "DELETE"
+                method: "POST",
+
+                body: {
+
+                    timestamp:
+                        new Date().toISOString(),
+
+                    chemical:
+                        fresh.chemical,
+
+                    action:
+                        "CORRECTION-OUT",
+
+                    quantity:
+                        restoreQty,
+
+                    unit:
+                        fresh.unit,
+
+                    area:
+                        log.area || null,
+
+                    shift:
+                        getCurrentShift(),
+
+                    new_main_balance:
+                        newBalance,
+
+                    new_area_balance:
+                        newBalance,
+
+                    operator_name:
+                        `CORRECTION OF ${log.operator_name || "UNKNOWN"}`,
+
+                    received_by:
+                        null
+                },
+
+                prefer:
+                    "return=representation"
             }
         );
 
@@ -2235,53 +2818,363 @@ async function deleteDelivery(logId) {
         chem.balance =
             newBalance;
 
-
         await loadLogs();
-
-        applyFilters();
 
         renderChems();
 
+        applyFilters();
+
         updateNotifBadge();
 
-
-        alert(
-            "Delivery record removed. Stock adjusted!"
+        showToast(
+            "Usage corrected and stock restored."
         );
 
     } catch (error) {
 
-        console.error(error);
-
-        alert(
-            "Unable to delete delivery.\n\n" +
-            error.message
+        console.error(
+            error
         );
+
+        showToast(
+            error.message ||
+            "Correction failed.",
+            "error"
+        );
+
     }
+
 }
 
 
-/* ============================================================
-   ANALYTICS
-   ============================================================ */
+/* =========================================================
+   CORRECT DELIVERY
+   ========================================================= */
 
-function renderStats(period) {
+async function correctDelivery(
+    logId
+) {
+
+    const confirmed =
+        confirm(
+            "CORRECTION:\n\nThis will REMOVE the delivered quantity from inventory and create a correction record.\n\nContinue?"
+        );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const log =
+        logs.find(
+            l => String(l.id) ===
+            String(logId)
+        );
+
+    if (!log) {
+
+        showToast(
+            "Delivery record not found.",
+            "error"
+        );
+
+        return;
+    }
+
+    const chem =
+        findChemicalByName(
+            log.chemical
+        );
+
+    if (!chem || !chem.dbId) {
+
+        showToast(
+            "Chemical inventory record not found.",
+            "error"
+        );
+
+        return;
+    }
+
+    try {
+
+        const freshRows =
+            await supabaseRequest(
+                "chemical_inventory",
+                {
+                    method: "GET",
+                    query:
+                        `?select=id,chemical,unit,quantity&id=eq.${encodeURIComponent(chem.dbId)}`
+                }
+            );
+
+        const fresh =
+            freshRows?.[0];
+
+        if (!fresh) {
+            throw new Error(
+                "Inventory record not found."
+            );
+        }
+
+        const currentBalance =
+            Number(fresh.quantity || 0);
+
+        const deliveryQty =
+            Number(log.quantity || 0);
+
+        if (
+            deliveryQty >
+            currentBalance
+        ) {
+
+            throw new Error(
+                `Cannot correct delivery. Current balance (${formatNumber(currentBalance)}) is lower than delivery quantity (${formatNumber(deliveryQty)}).`
+            );
+        }
+
+        const newBalance =
+            currentBalance -
+            deliveryQty;
+
+
+        /* UPDATE INVENTORY */
+
+        await supabaseRequest(
+            "chemical_inventory",
+            {
+                method: "PATCH",
+
+                query:
+                    `?id=eq.${encodeURIComponent(chem.dbId)}`,
+
+                body: {
+
+                    quantity:
+                        newBalance,
+
+                    updated_at:
+                        new Date().toISOString()
+                },
+
+                prefer:
+                    "return=representation"
+            }
+        );
+
+
+        /* CORRECTION LOG */
+
+        await supabaseRequest(
+            "chemical_logs",
+            {
+                method: "POST",
+
+                body: {
+
+                    timestamp:
+                        new Date().toISOString(),
+
+                    chemical:
+                        fresh.chemical,
+
+                    action:
+                        "CORRECTION-IN",
+
+                    quantity:
+                        deliveryQty,
+
+                    unit:
+                        fresh.unit,
+
+                    area:
+                        null,
+
+                    shift:
+                        getCurrentShift(),
+
+                    new_main_balance:
+                        newBalance,
+
+                    new_area_balance:
+                        newBalance,
+
+                    operator_name:
+                        "DELIVERY CORRECTION",
+
+                    received_by:
+                        log.received_by || null
+                },
+
+                prefer:
+                    "return=representation"
+            }
+        );
+
+
+        chem.balance =
+            newBalance;
+
+        await loadLogs();
+
+        renderChems();
+
+        applyFilters();
+
+        updateNotifBadge();
+
+        showToast(
+            "Delivery corrected and stock adjusted."
+        );
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        showToast(
+            error.message ||
+            "Delivery correction failed.",
+            "error"
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   ANALYTICS
+   ========================================================= */
+
+function renderStats(
+    period = "today"
+) {
 
     const container =
         document.getElementById(
             "admin-content-area"
         );
 
+    const now =
+        new Date();
+
+    let filtered =
+        logs.filter(
+            l =>
+                l.action === "OUT"
+        );
+
+
+    if (period === "today") {
+
+        filtered =
+            filtered.filter(
+                l =>
+                    l.timestamp &&
+                    l.timestamp.slice(0, 10) ===
+                    getToday()
+            );
+
+    }
+
+
+    if (period === "month") {
+
+        const month =
+            `${now.getFullYear()}-${String(
+                now.getMonth() + 1
+            ).padStart(2, "0")}`;
+
+        filtered =
+            filtered.filter(
+                l =>
+                    l.timestamp &&
+                    l.timestamp.startsWith(month)
+            );
+
+    }
+
+
+    if (period === "year") {
+
+        const year =
+            String(
+                now.getFullYear()
+            );
+
+        filtered =
+            filtered.filter(
+                l =>
+                    l.timestamp &&
+                    l.timestamp.startsWith(year)
+            );
+
+    }
+
+
+    const areas = [
+        "BOILER",
+        "WTP",
+        "WWTP",
+        "OTHERS"
+    ];
+
+
+    const totalUsage =
+        filtered.reduce(
+            (sum, l) =>
+                sum +
+                Number(l.quantity || 0),
+            0
+        );
+
+
+    const chemicalTotals = {};
+
+    filtered.forEach(l => {
+
+        const name =
+            l.chemical || "Unknown";
+
+        chemicalTotals[name] =
+            (chemicalTotals[name] || 0) +
+            Number(l.quantity || 0);
+
+    });
+
+
+    const sortedChemicals =
+        Object.entries(
+            chemicalTotals
+        )
+            .sort(
+                (a, b) =>
+                    b[1] - a[1]
+            );
+
 
     container.innerHTML = `
 
-        <div class="bg-white p-6 rounded-[2.5rem] border border-emerald-100 shadow-sm mb-4">
+        <div
+            class="bg-white p-6 rounded-[2.5rem] border border-emerald-100 shadow-sm mb-4">
 
             <div class="flex justify-between items-center mb-6">
 
-                <h3 class="text-[10px] font-black uppercase text-emerald-800/40">
-                    Analytics
-                </h3>
+                <div>
+
+                    <h3
+                        class="text-[10px] font-black uppercase text-emerald-800/40">
+                        Analytics
+                    </h3>
+
+                    <p
+                        class="text-[8px] text-slate-400 uppercase font-bold mt-1">
+                        Chemical usage monitoring
+                    </p>
+
+                </div>
+
 
                 <select
                     id="stat-p"
@@ -2304,200 +3197,187 @@ function renderStats(period) {
 
             </div>
 
-            <div
-                id="stats-chart"
-                class="space-y-6">
+
+            <div class="grid grid-cols-2 gap-3 mb-6">
+
+                <div
+                    class="bg-emerald-50 rounded-2xl p-4">
+
+                    <span
+                        class="block text-[7px] font-black uppercase text-emerald-400">
+                        Total Usage
+                    </span>
+
+                    <strong
+                        class="block text-xl font-black text-emerald-900 mt-1">
+                        ${formatNumber(totalUsage)}
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="bg-slate-50 rounded-2xl p-4">
+
+                    <span
+                        class="block text-[7px] font-black uppercase text-slate-400">
+                        Transactions
+                    </span>
+
+                    <strong
+                        class="block text-xl font-black text-slate-800 mt-1">
+                        ${filtered.length}
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div class="space-y-5">
+
+                ${
+                    areas.map(area => {
+
+                        const areaLogs =
+                            filtered.filter(
+                                l =>
+                                    l.area === area
+                            );
+
+                        const total =
+                            areaLogs.reduce(
+                                (sum, l) =>
+                                    sum +
+                                    Number(
+                                        l.quantity || 0
+                                    ),
+                                0
+                            );
+
+                        const max =
+                            Math.max(
+                                totalUsage,
+                                1
+                            );
+
+                        const percentage =
+                            Math.min(
+                                (total / max) * 100,
+                                100
+                            );
+
+                        return `
+
+                            <div>
+
+                                <div
+                                    class="flex justify-between text-[10px] font-black mb-1 uppercase">
+
+                                    <span>
+                                        ${escapeHtml(area)}
+                                    </span>
+
+                                    <span class="text-emerald-600">
+                                        ${formatNumber(total)} Units
+                                    </span>
+
+                                </div>
+
+
+                                <div
+                                    class="bg-emerald-50 h-3 rounded-full overflow-hidden border border-emerald-100">
+
+                                    <div
+                                        class="bg-emerald-600 h-full rounded-full transition-all duration-1000"
+                                        style="width:${percentage}%">
+                                    </div>
+
+                                </div>
+
+
+                            </div>
+
+                        `;
+
+                    }).join("")
+                }
+
             </div>
 
         </div>
+
+
+        <div
+            class="bg-white p-6 rounded-[2.5rem] border border-emerald-100 shadow-sm">
+
+            <h3
+                class="text-[10px] font-black uppercase text-emerald-800/40 mb-5">
+                Chemical Consumption
+            </h3>
+
+            <div class="space-y-3">
+
+                ${
+                    sortedChemicals.length
+
+                        ? sortedChemicals.map(
+                            ([name, qty]) => `
+
+                                <div
+                                    class="flex justify-between items-center p-3 bg-emerald-50/60 rounded-2xl">
+
+                                    <span
+                                        class="text-[9px] font-black uppercase text-emerald-900">
+
+                                        ${escapeHtml(name)}
+
+                                    </span>
+
+                                    <span
+                                        class="text-[10px] font-black text-emerald-700">
+
+                                        ${formatNumber(qty)}
+
+                                    </span>
+
+                                </div>
+
+                            `
+                        ).join("")
+
+                        : `
+                            <div
+                                class="py-10 text-center text-emerald-100 text-[10px] font-black uppercase italic">
+                                No Data
+                            </div>
+                        `
+                }
+
+            </div>
+
+        </div>
+
     `;
 
+    document
+        .getElementById("stat-p")
+        .value =
+        period;
 
-    document.getElementById(
-        "stat-p"
-    ).value = period;
-
-
-    const chart =
-        document.getElementById(
-            "stats-chart"
-        );
-
-
-    const now =
-        new Date();
-
-
-    let fl =
-        logs.filter(
-            l =>
-                l.type === "OUT"
-        );
-
-
-    if (period === "month") {
-
-        const month =
-            `${now.getFullYear()}-${String(
-                now.getMonth() + 1
-            ).padStart(2, "0")}`;
-
-        fl =
-            fl.filter(
-                l =>
-                    l.date.startsWith(month)
-            );
-    }
-
-
-    if (period === "today") {
-
-        fl =
-            fl.filter(
-                l =>
-                    l.date === getToday()
-            );
-    }
-
-
-    if (period === "year") {
-
-        const year =
-            String(now.getFullYear());
-
-        fl =
-            fl.filter(
-                l =>
-                    l.date.startsWith(year)
-            );
-    }
-
-
-    const areas = [
-        "BOILER",
-        "WTP",
-        "WWTP",
-        "OTHERS"
-    ];
-
-
-    chart.innerHTML =
-        fl.length
-
-            ? areas.map(area => {
-
-                const areaLogs =
-                    fl.filter(
-                        l =>
-                            l.area === area
-                    );
-
-
-                const total =
-                    areaLogs.reduce(
-                        (acc, curr) =>
-                            acc + Number(curr.qty),
-                        0
-                    );
-
-
-                const chemMap = {};
-
-
-                areaLogs.forEach(l => {
-
-                    chemMap[l.chemName] =
-                        (
-                            chemMap[l.chemName] ||
-                            0
-                        ) +
-                        Number(l.qty);
-
-                });
-
-
-                const maxVal =
-                    period === "year"
-                        ? 1000
-                        : period === "month"
-                            ? 200
-                            : 30;
-
-
-                const perc =
-                    Math.min(
-                        (total / maxVal) * 100,
-                        100
-                    );
-
-
-                return `
-
-                    <div>
-
-                        <div class="flex justify-between text-[10px] font-black mb-1 uppercase">
-
-                            <span>
-                                ${area}
-                            </span>
-
-                            <span class="text-emerald-600">
-                                ${total} Units
-                            </span>
-
-                        </div>
-
-
-                        <div class="bg-emerald-50 h-3 rounded-full overflow-hidden border border-emerald-100">
-
-                            <div
-                                class="bg-emerald-600 h-full rounded-full transition-all duration-1000"
-                                style="width: ${perc}%">
-                            </div>
-
-                        </div>
-
-
-                        <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-
-                            ${
-                                Object.entries(
-                                    chemMap
-                                )
-                                .map(
-                                    ([name, qty]) =>
-                                        `<span class="text-[8px] font-black text-emerald-400 uppercase italic">
-                                            • ${name} (${qty})
-                                        </span>`
-                                )
-                                .join("")
-                            }
-
-                        </div>
-
-                    </div>
-                `;
-
-            }).join("")
-
-            : `
-
-                <div class="py-12 text-center text-emerald-100 text-[10px] font-black uppercase italic">
-
-                    No Data
-
-                </div>
-            `;
 }
 
 
-/* ============================================================
-   TABS
-   ============================================================ */
+/* =========================================================
+   LOG TAB
+   ========================================================= */
 
-function setLogTab(tab) {
+function setLogTab(
+    tab
+) {
 
-    activeTab = tab;
+    activeTab =
+        tab;
 
     [
         "OUT",
@@ -2513,26 +3393,31 @@ function setLogTab(tab) {
                 "tab-active",
                 id === tab
             );
+
     });
 
 
     renderFilterBar();
 
 
-    if (tab !== "STATS") {
+    if (tab === "STATS") {
 
-        applyFilters();
+        renderStats(
+            "today"
+        );
 
     } else {
 
-        renderStats("today");
+        applyFilters();
+
     }
+
 }
 
 
-/* ============================================================
+/* =========================================================
    SHIFT SUMMARY
-   ============================================================ */
+   ========================================================= */
 
 function showShiftSummary() {
 
@@ -2542,837 +3427,307 @@ function showShiftSummary() {
     const today =
         getToday();
 
-
     const todayLogs =
         logs.filter(
             l =>
-                l.date === today
+                l.timestamp &&
+                l.timestamp.slice(0, 10) ===
+                today
         );
-
 
     const usage =
         todayLogs.filter(
             l =>
-                l.type === "OUT"
+                l.action === "OUT"
         );
-
 
     const delivery =
         todayLogs.filter(
             l =>
-                l.type === "IN"
+                l.action === "IN"
         );
 
 
-    let res =
-        `📌 SHIFT REPORT (${shift})\n` +
+    let report =
+        `📌 SHIFT REPORT (${shift})\n`;
+
+    report +=
         `Date: ${today}\n\n`;
 
-
-    res +=
+    report +=
         `--- USAGE ---\n`;
 
 
     if (usage.length) {
 
-        chemicals.forEach(c => {
+        chemicals.forEach(
+            chem => {
 
-            const used =
-                usage
-                    .filter(
-                        l =>
-                            l.chemId === c.id
-                    )
-                    .reduce(
-                        (acc, curr) =>
-                            acc + Number(curr.qty),
-                        0
-                    );
+                const used =
+                    usage
+                        .filter(
+                            l =>
+                                normalizeChemicalName(
+                                    l.chemical
+                                ) ===
+                                normalizeChemicalName(
+                                    chem.name
+                                )
+                        )
+                        .reduce(
+                            (sum, l) =>
+                                sum +
+                                Number(
+                                    l.quantity || 0
+                                ),
+                            0
+                        );
 
+                if (used > 0) {
 
-            if (used > 0) {
+                    report +=
+                        `🔹 ${chem.name}: ${formatNumber(used)} ${chem.unit}\n`;
+                }
 
-                res +=
-                    `🔹 ${c.name}: ${used} ${c.unit}\n`;
             }
-        });
+        );
 
     } else {
 
-        res +=
+        report +=
             "(No usage)\n";
+
     }
 
 
-    res +=
+    report +=
         `\n--- DELIVERIES ---\n`;
 
 
     if (delivery.length) {
 
-        delivery.forEach(d => {
+        delivery.forEach(
+            d => {
 
-            res +=
-                `📦 ${d.chemName}: +${d.qty} ${d.unit} (${d.operator})\n`;
-        });
+                report +=
+                    `📦 ${d.chemical}: +${formatNumber(d.quantity)} ${d.unit || ""} (${d.received_by || "N/A"})\n`;
 
-    } else {
-
-        res +=
-            "(No deliveries)\n";
-    }
-
-
-    document.getElementById(
-        "summary-text"
-    ).innerText = res;
-
-
-    document.getElementById(
-        "summary-modal"
-    ).style.display = "flex";
-
-
-    document.getElementById(
-        "summary-badge"
-    ).classList.add("hidden");
-}
-
-
-/* ============================================================
-   PRINT FILTERED REPORT
-   ============================================================ */
-
-function printFilteredReport() {
-
-    let filtered = [
-        ...logs
-    ];
-
-
-    const dateElement =
-        document.getElementById("f-date");
-
-    const dateValue =
-        dateElement
-            ? dateElement.value
-            : "";
-
-
-    if (dateValue) {
-
-        filtered =
-            filtered.filter(
-                l =>
-                    l.date === dateValue
-            );
-
-    } else {
-
-        const month =
-            getToday().slice(0, 7);
-
-        filtered =
-            filtered.filter(
-                l =>
-                    l.date.startsWith(month)
-            );
-    }
-
-
-    if (activeTab === "OUT") {
-
-        const chemElement =
-            document.getElementById("f-chem");
-
-        const areaElement =
-            document.getElementById("f-area");
-
-
-        const chemFilter =
-            chemElement
-                ? chemElement.value
-                : "ALL";
-
-
-        const areaFilter =
-            areaElement
-                ? areaElement.value
-                : "ALL";
-
-
-        filtered =
-            filtered.filter(
-                l =>
-                    l.type === "OUT"
-            );
-
-
-        if (chemFilter !== "ALL") {
-
-            filtered =
-                filtered.filter(
-                    l =>
-                        l.chemId === chemFilter
-                );
-        }
-
-
-        if (areaFilter !== "ALL") {
-
-            filtered =
-                filtered.filter(
-                    l =>
-                        l.area === areaFilter
-                );
-        }
-
-    } else {
-
-        filtered =
-            filtered.filter(
-                l =>
-                    l.type === "IN"
-            );
-
-
-        const receiverElement =
-            document.getElementById("f-rcv");
-
-
-        const search =
-            receiverElement
-                ? receiverElement.value
-                    .trim()
-                    .toUpperCase()
-                : "";
-
-
-        if (search) {
-
-            filtered =
-                filtered.filter(
-                    l =>
-                        (l.operator || "")
-                            .toUpperCase()
-                            .includes(search)
-                );
-        }
-    }
-
-
-    buildPrintReport(
-        filtered,
-        activeTab === "OUT"
-            ? "CHEMICAL USAGE REPORT"
-            : "CHEMICAL DELIVERY REPORT"
-    );
-
-
-    window.print();
-}
-
-
-/* ============================================================
-   PRINT SHIFT SUMMARY
-   ============================================================ */
-
-function printReport() {
-
-    const summary =
-        document.getElementById(
-            "summary-text"
-        ).innerText;
-
-
-    const lines =
-        summary
-            .split("\n")
-            .map(
-                line =>
-                    `<div>${escapeHtml(line)}</div>`
-            )
-            .join("");
-
-
-    document.getElementById(
-        "print-report"
-    ).innerHTML = `
-
-        <h1 style="
-            font-family: Arial;
-            font-size: 22px;
-            font-weight: 900;
-            text-align:center;
-            margin-bottom:10px;
-        ">
-            AB NUTRIBEV CORPORATION
-        </h1>
-
-        <h2 style="
-            font-family: Arial;
-            font-size: 18px;
-            text-align:center;
-            margin-bottom:20px;
-        ">
-            CHEMICAL LOGBOOK
-        </h2>
-
-        <div style="
-            font-family: Arial;
-            font-size: 12px;
-            line-height: 1.8;
-        ">
-            ${lines}
-        </div>
-
-        <br><br>
-
-        <div style="
-            display:flex;
-            justify-content:space-between;
-            font-family:Arial;
-            font-size:12px;
-        ">
-
-            <span>
-                Prepared by: ____________________
-            </span>
-
-            <span>
-                Verified by: ____________________
-            </span>
-
-        </div>
-    `;
-
-
-    window.print();
-}
-
-
-/* ============================================================
-   BUILD PRINT TABLE
-   ============================================================ */
-
-function buildPrintReport(data, title) {
-
-    const rows =
-        data.map(
-            l => `
-
-                <tr>
-
-                    <td>
-                        ${escapeHtml(formatDate(l.timestamp))}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(formatTime(l.timestamp))}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(l.chemName || "")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(l.area || "")}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(l.operator || "")}
-                    </td>
-
-                    <td>
-                        ${l.qty}
-                    </td>
-
-                    <td>
-                        ${escapeHtml(l.unit || "")}
-                    </td>
-
-                    <td>
-                        ${l.newMainBalance ?? ""}
-                    </td>
-
-                </tr>
-            `
-        ).join("");
-
-
-    document.getElementById(
-        "print-report"
-    ).innerHTML = `
-
-        <div style="
-            font-family:Arial;
-            color:#111;
-        ">
-
-            <h1 style="
-                text-align:center;
-                font-size:20px;
-                font-weight:900;
-                margin:0;
-            ">
-                AB NUTRIBEV CORPORATION
-            </h1>
-
-            <h2 style="
-                text-align:center;
-                font-size:17px;
-                margin:5px 0;
-            ">
-                CHEMICAL LOGBOOK
-            </h2>
-
-            <h3 style="
-                text-align:center;
-                font-size:14px;
-                margin:5px 0 20px;
-            ">
-                ${escapeHtml(title)}
-            </h3>
-
-
-            <table
-                style="
-                    width:100%;
-                    border-collapse:collapse;
-                    font-size:10px;
-                ">
-
-                <thead>
-
-                    <tr>
-
-                        <th style="border:1px solid #999;padding:6px;">
-                            Date
-                        </th>
-
-                        <th style="border:1px solid #999;padding:6px;">
-                            Time
-                        </th>
-
-                        <th style="border:1px solid #999;padding:6px;">
-                            Chemical
-                        </th>
-
-                        <th style="border:1px solid #999;padding:6px;">
-                            Area
-                        </th>
-
-                        <th style="border:1px solid #999;padding:6px;">
-                            Operator
-                        </th>
-
-                        <th style="border:1px solid #999;padding:6px;">
-                            Qty
-                        </th>
-
-                        <th style="border:1px solid #999;padding:6px;">
-                            Unit
-                        </th>
-
-                        <th style="border:1px solid #999;padding:6px;">
-                            Balance
-                        </th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    ${rows}
-
-                </tbody>
-
-            </table>
-
-
-            <br><br>
-
-            <div style="
-                display:flex;
-                justify-content:space-between;
-                font-size:11px;
-            ">
-
-                <span>
-                    Prepared by: ______________________
-                </span>
-
-                <span>
-                    Checked by: ______________________
-                </span>
-
-                <span>
-                    Approved by: ______________________
-                </span>
-
-            </div>
-
-        </div>
-    `;
-}
-
-
-/* ============================================================
-   EXCEL / CSV EXPORT
-   ============================================================ */
-
-function exportCSV() {
-
-    let data =
-        [...logs];
-
-
-    const dateElement =
-        document.getElementById("f-date");
-
-    const dateValue =
-        dateElement
-            ? dateElement.value
-            : "";
-
-
-    if (activeTab === "OUT") {
-
-        data =
-            data.filter(
-                l =>
-                    l.type === "OUT"
-            );
-
-        const chemElement =
-            document.getElementById("f-chem");
-
-        const areaElement =
-            document.getElementById("f-area");
-
-
-        const chemFilter =
-            chemElement
-                ? chemElement.value
-                : "ALL";
-
-
-        const areaFilter =
-            areaElement
-                ? areaElement.value
-                : "ALL";
-
-
-        if (chemFilter !== "ALL") {
-
-            data =
-                data.filter(
-                    l =>
-                        l.chemId === chemFilter
-                );
-        }
-
-
-        if (areaFilter !== "ALL") {
-
-            data =
-                data.filter(
-                    l =>
-                        l.area === areaFilter
-                );
-        }
-
-    } else {
-
-        data =
-            data.filter(
-                l =>
-                    l.type === "IN"
-            );
-
-
-        const receiverElement =
-            document.getElementById("f-rcv");
-
-
-        const search =
-            receiverElement
-                ? receiverElement.value
-                    .trim()
-                    .toUpperCase()
-                : "";
-
-
-        if (search) {
-
-            data =
-                data.filter(
-                    l =>
-                        (l.operator || "")
-                            .toUpperCase()
-                            .includes(search)
-                );
-        }
-    }
-
-
-    if (dateValue) {
-
-        data =
-            data.filter(
-                l =>
-                    l.date === dateValue
-            );
-
-    } else {
-
-        const month =
-            getToday().slice(0, 7);
-
-        data =
-            data.filter(
-                l =>
-                    l.date.startsWith(month)
-            );
-    }
-
-
-    const header = [
-        "Date",
-        "Time",
-        "Chemical",
-        "Action",
-        "Area",
-        "Shift",
-        "Operator Name",
-        "Quantity",
-        "Unit",
-        "New Main Balance",
-        "New Area Balance"
-    ];
-
-
-    const csvRows = [
-        header
-    ];
-
-
-    data.forEach(l => {
-
-        csvRows.push([
-            l.date,
-            l.time,
-            l.chemName,
-            l.type,
-            l.area,
-            l.shift || "",
-            l.operator || "",
-            l.qty,
-            l.unit,
-            l.newMainBalance ?? "",
-            l.newAreaBalance ?? ""
-        ]);
-    });
-
-
-    const csv =
-        csvRows
-            .map(
-                row =>
-                    row
-                        .map(
-                            value =>
-                                `"${String(value ?? "")
-                                    .replace(/"/g, '""')}"`
-                        )
-                        .join(",")
-            )
-            .join("\n");
-
-
-    const blob =
-        new Blob(
-            [
-                "\uFEFF" +
-                csv
-            ],
-            {
-                type:
-                    "text/csv;charset=utf-8;"
             }
         );
 
+    } else {
 
-    const url =
-        URL.createObjectURL(blob);
+        report +=
+            "(No deliveries)\n";
 
-
-    const link =
-        document.createElement("a");
-
-
-    const date =
-        getToday();
+    }
 
 
-    link.href =
-        url;
+    document
+        .getElementById(
+            "summary-text"
+        )
+        .innerText =
+        report;
 
+    document
+        .getElementById(
+            "summary-modal"
+        )
+        .style.display =
+        "flex";
 
-    link.download =
-        `ABN-Chemical-Logbook-${activeTab}-${date}.csv`;
+    document
+        .getElementById(
+            "summary-badge"
+        )
+        .classList.add(
+            "hidden"
+        );
 
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    link.remove();
-
-
-    URL.revokeObjectURL(url);
 }
 
 
-/* ============================================================
-   HTML ESCAPE
-   ============================================================ */
+/* =========================================================
+   COPY REPORT
+   ========================================================= */
 
-function escapeHtml(value) {
+async function copyReport() {
 
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    const text =
+        document
+            .getElementById(
+                "summary-text"
+            )
+            .innerText;
+
+    try {
+
+        await navigator.clipboard.writeText(
+            text
+        );
+
+        showToast(
+            "Report copied."
+        );
+
+    } catch {
+
+        showToast(
+            "Unable to copy report.",
+            "error"
+        );
+
+    }
+
 }
 
 
-/* ============================================================
-   NAVIGATION
-   ============================================================ */
+/* =========================================================
+   AREA NAVIGATION
+   ========================================================= */
 
-function selectArea(area) {
+function selectArea(
+    area
+) {
 
     currentArea =
         area;
 
     document
-        .getElementById("area-screen")
-        .classList.add("hidden");
+        .getElementById(
+            "area-screen"
+        )
+        .classList.add(
+            "hidden"
+        );
 
     document
-        .getElementById("chem-screen")
-        .classList.remove("hidden");
+        .getElementById(
+            "chem-screen"
+        )
+        .classList.remove(
+            "hidden"
+        );
 
     document
-        .getElementById("selected-area-label")
+        .getElementById(
+            "selected-area-label"
+        )
         .innerText =
-            area;
+        area;
 
     selectedQtys = {};
 
     renderChems();
+
 }
 
 
 function goBack() {
 
-    document
-        .getElementById("area-screen")
-        .classList.remove("hidden");
+    currentArea =
+        null;
 
     document
-        .getElementById("chem-screen")
-        .classList.add("hidden");
+        .getElementById(
+            "area-screen"
+        )
+        .classList.remove(
+            "hidden"
+        );
 
-    currentArea = null;
+    document
+        .getElementById(
+            "chem-screen"
+        )
+        .classList.add(
+            "hidden"
+        );
+
 }
 
 
-async function openAdmin() {
+/* =========================================================
+   ADMIN PANEL
+   ========================================================= */
+
+function openAdmin() {
 
     document
-        .getElementById("admin-dashboard")
-        .style.display = "flex";
+        .getElementById(
+            "admin-dashboard"
+        )
+        .style.display =
+        "flex";
 
     document
-        .getElementById("admin-dashboard")
-        .classList.remove("admin-hidden");
+        .getElementById(
+            "admin-dashboard"
+        )
+        .classList.remove(
+            "admin-hidden"
+        );
 
+    setLogTab(
+        "OUT"
+    );
 
-    await loadInventory();
-
-    await loadLogs();
-
-    setLogTab("OUT");
 }
 
 
 function closeAdmin() {
 
     document
-        .getElementById("admin-dashboard")
+        .getElementById(
+            "admin-dashboard"
+        )
         .style.display =
-            "none";
+        "none";
 
     document
-        .getElementById("admin-dashboard")
+        .getElementById(
+            "admin-dashboard"
+        )
         .classList.add(
             "admin-hidden"
         );
+
 }
 
 
 function toggleDeliveryForm() {
 
     document
-        .getElementById("delivery-form")
+        .getElementById(
+            "delivery-form"
+        )
         .classList.toggle(
             "hidden"
         );
+
 }
 
+
+/* =========================================================
+   SUMMARY MODAL
+   ========================================================= */
 
 function closeSummary() {
 
     document
-        .getElementById("summary-modal")
+        .getElementById(
+            "summary-modal"
+        )
         .style.display =
-            "none";
+        "none";
+
 }
 
 
-async function copyReport() {
-
-    try {
-
-        await navigator.clipboard.writeText(
-            document
-                .getElementById(
-                    "summary-text"
-                )
-                .innerText
-        );
-
-        alert(
-            "Report copied!"
-        );
-
-    } catch {
-
-        alert(
-            "Unable to copy report."
-        );
-    }
-}
-
-
-/* ============================================================
+/* =========================================================
    NOTIFICATION BADGES
-   ============================================================ */
+   ========================================================= */
 
 function updateNotifBadge() {
 
@@ -3383,16 +3738,13 @@ function updateNotifBadge() {
                 Number(c.alert)
         ).length;
 
-
     const notifBadge =
         document.getElementById(
             "notif-badge"
         );
 
-
     notifBadge.innerText =
         low;
-
 
     notifBadge.classList.toggle(
         "hidden",
@@ -3403,9 +3755,10 @@ function updateNotifBadge() {
     const todayCount =
         logs.filter(
             l =>
-                l.date === getToday()
+                l.timestamp &&
+                l.timestamp.slice(0, 10) ===
+                getToday()
         ).length;
-
 
     document
         .getElementById(
@@ -3415,12 +3768,428 @@ function updateNotifBadge() {
             "hidden",
             todayCount === 0
         );
+
 }
 
 
-/* ============================================================
+/* =========================================================
+   PRINT CURRENT REPORT
+   ========================================================= */
+
+function printCurrentReport() {
+
+    const data =
+        activeTab === "STATS"
+            ? logs.filter(
+                l =>
+                    l.action === "OUT"
+            )
+            : getFilteredLogs();
+
+    const title =
+        activeTab === "OUT"
+            ? "CHEMICAL USAGE REPORT"
+            : activeTab === "IN"
+                ? "CHEMICAL DELIVERY REPORT"
+                : "CHEMICAL ANALYTICS REPORT";
+
+    const rows =
+        data.map(
+            l => {
+
+                return `
+                    <tr>
+
+                        <td>
+                            ${escapeHtml(
+                                formatDateTime(
+                                    l.timestamp
+                                )
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                l.chemical
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                l.area || "-"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                l.shift || "-"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                l.operator_name ||
+                                l.received_by ||
+                                "-"
+                            )}
+                        </td>
+
+                        <td style="text-align:right;">
+                            ${formatNumber(
+                                l.quantity
+                            )}
+                            ${escapeHtml(
+                                l.unit || ""
+                            )}
+                        </td>
+
+                        <td style="text-align:right;">
+                            ${formatNumber(
+                                l.new_main_balance
+                            )}
+                        </td>
+
+                    </tr>
+                `;
+
+            }
+        ).join("");
+
+
+    const generatedAt =
+        new Date().toLocaleString(
+            "en-PH"
+        );
+
+
+    document
+        .getElementById(
+            "print-area"
+        )
+        .innerHTML = `
+
+            <div style="
+                font-family:Arial,sans-serif;
+                padding:25px;
+                color:#111;
+            ">
+
+                <div style="
+                    text-align:center;
+                    border-bottom:2px solid #111;
+                    padding-bottom:15px;
+                    margin-bottom:20px;
+                ">
+
+                    <h1 style="
+                        margin:0;
+                        font-size:20px;
+                    ">
+                        AB NUTRIBEV CORPORATION
+                    </h1>
+
+                    <h2 style="
+                        margin:8px 0 0;
+                        font-size:16px;
+                    ">
+                        ${title}
+                    </h2>
+
+                    <p style="
+                        margin:5px 0 0;
+                        font-size:11px;
+                    ">
+                        Generated: ${escapeHtml(generatedAt)}
+                    </p>
+
+                </div>
+
+
+                <table
+                    style="
+                        width:100%;
+                        border-collapse:collapse;
+                        font-size:10px;
+                    ">
+
+                    <thead>
+
+                        <tr>
+
+                            <th style="border:1px solid #333;padding:7px;">
+                                DATE / TIME
+                            </th>
+
+                            <th style="border:1px solid #333;padding:7px;">
+                                CHEMICAL
+                            </th>
+
+                            <th style="border:1px solid #333;padding:7px;">
+                                AREA
+                            </th>
+
+                            <th style="border:1px solid #333;padding:7px;">
+                                SHIFT
+                            </th>
+
+                            <th style="border:1px solid #333;padding:7px;">
+                                OPERATOR / RECEIVED BY
+                            </th>
+
+                            <th style="border:1px solid #333;padding:7px;">
+                                QTY
+                            </th>
+
+                            <th style="border:1px solid #333;padding:7px;">
+                                BALANCE
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        ${
+                            rows ||
+                            `
+                                <tr>
+                                    <td colspan="7"
+                                        style="
+                                            border:1px solid #333;
+                                            padding:20px;
+                                            text-align:center;
+                                        ">
+                                        NO RECORDS
+                                    </td>
+                                </tr>
+                            `
+                        }
+
+                    </tbody>
+
+                </table>
+
+
+                <div style="
+                    margin-top:25px;
+                    display:flex;
+                    justify-content:space-between;
+                    font-size:10px;
+                ">
+
+                    <span>
+                        Prepared By: ______________________
+                    </span>
+
+                    <span>
+                        Checked By: ______________________
+                    </span>
+
+                </div>
+
+            </div>
+        `;
+
+
+    window.print();
+
+}
+
+
+/* =========================================================
+   EXCEL EXPORT
+   ========================================================= */
+
+function exportCurrentExcel() {
+
+    if (
+        typeof XLSX ===
+        "undefined"
+    ) {
+
+        showToast(
+            "Excel library is not loaded. Check internet connection.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    let data =
+        activeTab === "STATS"
+            ? logs.filter(
+                l =>
+                    l.action === "OUT"
+            )
+            : getFilteredLogs();
+
+
+    const excelData =
+        data.map(
+            l => ({
+
+                "Date / Time":
+                    formatDateTime(
+                        l.timestamp
+                    ),
+
+                "Chemical":
+                    l.chemical || "",
+
+                "Action":
+                    l.action || "",
+
+                "Quantity":
+                    Number(
+                        l.quantity || 0
+                    ),
+
+                "Unit":
+                    l.unit || "",
+
+                "Area":
+                    l.area || "",
+
+                "Shift":
+                    l.shift || "",
+
+                "Operator Name":
+                    l.operator_name || "",
+
+                "Received By":
+                    l.received_by || "",
+
+                "New Main Balance":
+                    Number(
+                        l.new_main_balance || 0
+                    ),
+
+                "New Area Balance":
+                    Number(
+                        l.new_area_balance || 0
+                    )
+
+            })
+        );
+
+
+    if (!excelData.length) {
+
+        showToast(
+            "No records available for Excel export.",
+            "warning"
+        );
+
+        return;
+    }
+
+
+    const worksheet =
+        XLSX.utils.json_to_sheet(
+            excelData
+        );
+
+    const workbook =
+        XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Chemical Log"
+    );
+
+
+    const fileDate =
+        getToday();
+
+    const fileName =
+        activeTab === "OUT"
+            ? `Chemical_Usage_${fileDate}.xlsx`
+            : activeTab === "IN"
+                ? `Chemical_Deliveries_${fileDate}.xlsx`
+                : `Chemical_Analytics_${fileDate}.xlsx`;
+
+
+    XLSX.writeFile(
+        workbook,
+        fileName
+    );
+
+
+    showToast(
+        "Excel report generated successfully."
+    );
+
+}
+
+
+/* =========================================================
+   AUTO REFRESH
+   ========================================================= */
+
+setInterval(
+    async () => {
+
+        if (
+            document.visibilityState ===
+            "visible"
+        ) {
+
+            await loadInventory();
+            await loadLogs();
+
+            if (
+                !document
+                    .getElementById(
+                        "admin-dashboard"
+                    )
+                    .classList.contains(
+                        "admin-hidden"
+                    )
+            ) {
+
+                if (activeTab === "STATS") {
+                    renderStats("today");
+                } else {
+                    applyFilters();
+                }
+
+            }
+
+        }
+
+    },
+    30000
+);
+
+
+/* =========================================================
+   CLOSE MODALS WITH ESCAPE
+   ========================================================= */
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        if (
+            event.key ===
+            "Escape"
+        ) {
+
+            closeTxModal();
+            closeSummary();
+
+        }
+
+    }
+);
+
+
+/* =========================================================
    START APPLICATION
-   ============================================================ */
+   ========================================================= */
 
 init();
 
