@@ -688,7 +688,6 @@
 
 
 <script>
-
 /* =========================================================
    SUPABASE CONFIGURATION
    ========================================================= */
@@ -697,21 +696,12 @@ const SUPABASE_URL = "https://qbeacrpoyfacgmbzxjcu.supabase.co";
 
 const SUPABASE_KEY = "sb_publishable_ltaNA7nnVozoSCOcZIjg";
 
-/*
- IMPORTANT:
- Use only the Supabase anon/public key here.
- Never use service_role key in this browser file.
-*/
-
 
 /* =========================================================
    SUPABASE REST HELPER
    ========================================================= */
 
-async function supabaseRequest(
-    table,
-    options = {}
-) {
+async function supabaseRequest(table, options = {}) {
 
     const {
         method = "GET",
@@ -723,9 +713,18 @@ async function supabaseRequest(
     const url =
         `${SUPABASE_URL}/rest/v1/${table}${query}`;
 
+    /*
+     * IMPORTANT:
+     * New Supabase publishable keys are NOT JWT tokens.
+     *
+     * Therefore:
+     * ✅ send key through `apikey`
+     * ❌ do NOT send:
+     *    Authorization: Bearer sb_publishable_...
+     */
+
     const headers = {
         "apikey": SUPABASE_KEY,
-        "Authorization": `Bearer ${SUPABASE_KEY}`,
         "Content-Type": "application/json"
     };
 
@@ -755,11 +754,7 @@ async function supabaseRequest(
 
     if (!response.ok) {
 
-        console.error(
-            "[Supabase]",
-            response.status,
-            data
-        );
+        console.error("[Supabase]", response.status, data);
 
         const message =
             data?.message ||
@@ -773,7 +768,6 @@ async function supabaseRequest(
 
     return data;
 }
-
 
 /* =========================================================
    APPLICATION STATE
